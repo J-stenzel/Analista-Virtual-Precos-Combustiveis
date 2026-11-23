@@ -40,7 +40,7 @@ PROJETO = "Analista Virtual de Preços de Combustíveis"
 SUBTITULO = "Projeto Final — Do BI ao Analista Virtual"
 CURSO = "Tecnólogo em Banco de Dados — Faculdade de Tecnologia Impacta"
 MATERIA = "Artificial Intelligence"
-PROFESSOR = "Prof. Me. Cesar Augusto Cardoso Caetano"
+PROFESSOR = "Prof. Dr. Cesar Augusto Cardoso Caetano"
 PROFESSOR_URL = "https://www.linkedin.com/in/cesaraccaetano/"
 # (nome, link do LinkedIn ou None) — o link não muda a aparência do nome
 DESENVOLVEDORES = [("Douglas H. da Silva", None),

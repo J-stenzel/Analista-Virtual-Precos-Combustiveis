@@ -91,7 +91,7 @@
     **Configuração final:** Orquestrador gpt-6.1-terra · Agente SQL gpt-6.2-sol · Analista gpt-6-luna.
 - **Etapa 5 — acabamento (em andamento).**
   - ✅ 5.1 `src/app.py` (Streamlit, `streamlit run src/app.py`): cabeçalho com título do projeto + curso (Tecnólogo em
-    Banco de Dados — Faculdade de Tecnologia Impacta), matéria (Artificial Intelligence), professor (Me. Cesar Augusto
+    Banco de Dados — Faculdade de Tecnologia Impacta), matéria (Artificial Intelligence), professor (Dr. Cesar Augusto
     Cardoso Caetano); barra lateral azul com logos (ou selos), desenvolvedores, fonte ANP, exemplos clicáveis, modelos e
     gasto da sessão; faixa + 3 cartões (estilo da referência do aluno, cores vivas); conversa com histórico; progresso
     por agente (callback `ao_etapa` no orchestrator); texto + tabela completa + CSV + gráfico automático (Altair, eixo
@@ -117,7 +117,7 @@
     Chave colada nos Secrets pelo aluno e app testado online ✅.
   - ✅ 5.5 Ajustes visuais: pergunta (azul) × resposta (ciano) com borda/fundo/sombra (marcadores `.msg-usuario` /
     `.msg-analista` + CSS `:has()`); LinkedIn no chip do professor e no nome do Jeferson (aparência igual).
-    Pendente: aluno confirmar o título do professor (Me. × Dr.; o LinkedIn mostra PhD).
+    Título do professor: **Prof. Dr.** (decisão do aluno, 23/11 — o LinkedIn mostra PhD).
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
     explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
   Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).

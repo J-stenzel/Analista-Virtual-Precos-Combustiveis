@@ -16,7 +16,7 @@ Três agentes de IA consultam a base de dados da ANP **via SQL** (nunca colocand
 |---|---|
 | **Curso** | Tecnólogo em Banco de Dados — Faculdade de Tecnologia Impacta |
 | **Matéria** | Artificial Intelligence |
-| **Professor** | Prof. Me. Cesar Augusto Cardoso Caetano |
+| **Professor** | Prof. Dr. Cesar Augusto Cardoso Caetano |
 | **Grupo** | Douglas H. da Silva · Jeferson Stenzel · Leonardo M. L. Rodrigues · Leonardo M. Lima |
 | **App online** | **https://iaprecoscombustivel.streamlit.app/** (Streamlit Community Cloud) |
 
