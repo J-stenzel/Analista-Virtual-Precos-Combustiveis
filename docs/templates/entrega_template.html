@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+@page {
+  size: A4;
+  margin: 12mm 17mm 16mm 17mm;
+  @bottom-left { content: "Projeto Final — Do BI ao Analista Virtual · Checkpoint 1"; font: 8pt "DejaVu Sans"; color: #888; border-top: 0.5pt solid #ccc; padding-top: 4pt; vertical-align: top; }
+  @bottom-right { content: "Página " counter(page); font: 8pt "DejaVu Sans"; color: #888; border-top: 0.5pt solid #ccc; padding-top: 4pt; vertical-align: top; }
+}
+body { font-family: "DejaVu Sans", sans-serif; font-size: 8.4pt; line-height: 1.28; color: #111; }
+h1 { color: #1F4E79; font-size: 18pt; line-height: 1.15; margin: 0 0 3pt 0; }
+.sub { color: #555; font-size: 11pt; margin: 0 0 2pt 0; }
+.disc { color: #666; font-size: 8.4pt; margin: 0 0 5pt 0; }
+h2 { color: #1F4E79; font-size: 12pt; margin: 7pt 0 3pt 0; }
+p { margin: 0 0 4pt 0; }
+.box { background: #E8EFF8; border-left: 4pt solid #1F4E79; padding: 5pt 8pt; margin: 4pt 0 6pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 3pt 0 4pt 0; font-size: 7.9pt; }
+th { background: #1F4E79; color: #fff; text-align: left; padding: 3pt 5pt; font-weight: bold; }
+td { border: 0.5pt solid #c9d3df; padding: 2.5pt 5pt; vertical-align: top; }
+tr:nth-child(even) td { background: #EEF3FA; }
+td.n { text-align: right; white-space: nowrap; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 7.6pt; }
+ol { margin: 2pt 0 4pt 0; padding-left: 16pt; }
+ol li { margin-bottom: 1.5pt; }
+.small { font-size: 8pt; color: #333; }
+</style>
+</head>
+<body>
+
+<h1>Checkpoint 1: Analista Virtual de Preços de Combustíveis</h1>
+<p class="sub">Etapa 1 — Problema e dados</p>
+<p class="disc">Disciplina de Inteligência Artificial · Projeto Final “Do BI ao Analista Virtual”<br>
+<b>Grupo:</b> Douglas H. da Silva, Jeferson Stenzel, Leonardo M. L. Rodrigues e Leonardo M. Lima</p>
+
+<h2>1. Tema</h2>
+<div class="box"><b>Objetivo:</b> um analista virtual que responde, em linguagem natural, perguntas sobre <b>preços de combustíveis ao consumidor no Brasil</b>. O usuário consulta preços por local (região, estado, município, CEP), produto, bandeira, período e posto, e faz comparações (bandeira × bandeira branca, etanol × gasolina, variação no tempo).</div>
+
+<h2>2. Fonte dos dados</h2>
+<p><b>ANP — Série Histórica de Preços de Combustíveis</b> (Levantamento de Preços de Combustíveis — LPC), dados abertos: <code>gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis</code>. Arquivos semestrais de combustíveis automotivos de <b>jan/2020 a jun/2026</b> (13 arquivos CSV, ~5,47 milhões de linhas, 16 colunas). Sem dados pessoais sensíveis: CNPJ e endereço são de empresas (postos). A coluna “Valor de Compra” foi descartada (só existe até ago/2020).</p>
+
+<h2>3. Descrição das tabelas (modelo estrela)</h2>
+<table>
+<tr><th>Tabela</th><th style="text-align:right">Linhas</th><th>Grão / conteúdo</th><th>Chave</th></tr>
+<tr><td><code>fato_precos</code></td><td class="n">5.463.890</td><td>1 preço de venda de 1 produto, em 1 posto, em 1 data de coleta</td><td>data + cnpj + id_produto</td></tr>
+<tr><td><code>dim_tempo</code></td><td class="n">2.373</td><td>1 dia: ano, semestre, trimestre, mês, semana, dia da semana</td><td>data</td></tr>
+<tr><td><code>dim_local</code></td><td class="n">471</td><td>Hierarquia Região → UF → município</td><td>id_local</td></tr>
+<tr><td><code>dim_produto</code></td><td class="n">6</td><td>Gasolina, gasolina aditivada, etanol, diesel, diesel S10, GNV + unidade</td><td>id_produto</td></tr>
+<tr><td><code>dim_bandeira</code></td><td class="n">76</td><td>Bandeira padronizada (ex.: Petrobras Distribuidora / Vibra Energia → VIBRA) + flag bandeira branca</td><td>id_bandeira</td></tr>
+<tr><td><code>dim_posto</code></td><td class="n">21.103</td><td>CNPJ, razão social, bairro, CEP, data da 1ª e da última coleta</td><td>cnpj</td></tr>
+</table>
+<p class="small">A <code>fato_precos</code> liga-se a cada dimensão pela respectiva chave. 15 testes automáticos de qualidade (nulos, duplicatas, chaves órfãs, faixa de preço): todos os críticos aprovados. Lacuna conhecida: set/2020 sem coleta.</p>
+
+<h2>4. As 10 perguntas de negócio</h2>
+<ol>
+<li>Qual é o preço atual da gasolina no CEP 03210-001?</li>
+<li>Pela regra dos 70%, liste até 10 postos do município de São Paulo onde o etanol compensa na coleta mais recente.</li>
+<li>Qual município do Brasil tem a maior média de preço atual da gasolina?</li>
+<li>Qual município do Brasil tem a menor média de preço atual do etanol?</li>
+<li>Qual é o preço médio do diesel S10 no estado do Paraná no último mês com pesquisa?</li>
+<li>Quantos postos foram pesquisados em Curitiba no último mês com pesquisa?</li>
+<li>Como evoluiu, mês a mês, o preço médio da gasolina no Brasil em 2025?</li>
+<li>Postos bandeira branca são mais baratos que os de bandeira? Diferença média da gasolina por região no último mês com pesquisa.</li>
+<li>Qual foi a variação % do preço médio da gasolina entre o 1º semestre de 2025 e o 1º semestre de 2026, por estado?</li>
+<li>Em Belo Horizonte, qual a diferença entre o posto mais caro e o mais barato do etanol no último mês com pesquisa?</li>
+</ol>
+<p class="small"><b>Regras de negócio:</b> “atual” = última coleta do posto ou último mês com pesquisa do local; rankings entre locais usam o último trimestre com pesquisa e exigem ≥ 5 postos; etanol compensa se custar ≤ 70% da gasolina (mesmo posto e data); <b>toda resposta informa a data/período da pesquisa</b>.</p>
+
+<h2>5. Papéis no grupo</h2>
+<div class="box"><b>Douglas H. da Silva · Jeferson Stenzel · Leonardo M. L. Rodrigues · Leonardo M. Lima</b><br>Por decisão do grupo, <b>cada integrante desenvolve o projeto completo, do início ao fim</b> (dados, camada semântica, agentes, avaliação e interface), com foco no aprendizado. Assim, todos sabem explicar qualquer parte do projeto.</div>
+
+</body>
+</html>

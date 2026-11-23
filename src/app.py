@@ -1,0 +1,326 @@
+"""
+Interface do Analista Virtual de Preços de Combustíveis (Etapa 5 — Streamlit).
+
+Rodar (na raiz do projeto, com o venv ativo):
+    streamlit run src/app.py
+
+A interface só APRESENTA: toda a lógica está em orchestrator.responder() (3 agentes + camada semântica).
+Cada resposta mostra texto + tabela + SQL usado (exigências do enunciado), o progresso de cada agente,
+um gráfico automático quando faz sentido (feito pelo código, sem LLM) e o tempo/custo da resposta.
+Visual: identidade inspirada no site da Faculdade Impacta (fundo escuro, azul #116FFF, ciano #00D8FF, Montserrat).
+"""
+import base64
+import sys
+from pathlib import Path
+
+import altair as alt
+import pandas as pd
+import streamlit as st
+
+RAIZ = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(RAIZ / "src"))
+import llm           # noqa: E402
+import orchestrator  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Dados do projeto (cabeçalho e barra lateral)
+# ---------------------------------------------------------------------------
+PROJETO = "Analista Virtual de Preços de Combustíveis"
+SUBTITULO = "Projeto Final — Do BI ao Analista Virtual"
+CURSO = "Tecnólogo em Banco de Dados — Faculdade de Tecnologia Impacta"
+MATERIA = "Artificial Intelligence"
+PROFESSOR = "Prof. Me. Cesar Augusto Cardoso Caetano"
+DESENVOLVEDORES = ["Douglas H. da Silva", "Jeferson Stenzel", "Leonardo M. L. Rodrigues", "Leonardo M. Lima"]
+FONTE_URL = "https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis"
+LOGO_IMPACTA = RAIZ / "assets" / "logo_impacta.png"
+LOGO_ANP = RAIZ / "assets" / "logo_anp.png"
+MAX_CARACTERES = 500          # guardrail: evita perguntas enormes (custo)
+TURNOS_HISTORICO = 4          # quantos turnos anteriores vão para o Orquestrador
+
+# Perguntas de exemplo (as da demo — nenhuma é do golden set)
+EXEMPLOS = [
+    "Quanto está o álcool em Floripa?",
+    "Em Santa Catarina, posto sem bandeira é mais barato que posto de bandeira na gasolina?",
+    "Qual o preço do GNV no Rio de Janeiro?",
+    "Como variou mês a mês o preço médio da gasolina no Paraná em 2025?",
+    "Quais os 5 estados com o etanol mais barato atualmente?",
+]
+ETAPAS = {"orquestrador": "🧭 Orquestrador: entendendo a pergunta e buscando o contexto…",
+          "sql": "🧮 Agente SQL: escrevendo, validando e executando a consulta…",
+          "analista": "✍️ Agente Analista: redigindo a resposta…"}
+# Etiqueta e cor de cada tipo de resposta + texto do quadro de progresso quando termina
+CLASSES = {"DADOS": ("Resposta com dados", "#00A651", "Resposta pronta"),
+           "ESCLARECIMENTO": ("Preciso de um esclarecimento", "#FF8A00", "Preciso de uma informação sua para continuar"),
+           "FORA_DE_ESCOPO": ("Fora do escopo da base", "#F44336", "Pergunta fora do escopo da base")}
+
+# ---------------------------------------------------------------------------
+# Página e estilo
+# ---------------------------------------------------------------------------
+st.set_page_config(page_title=PROJETO, page_icon="⛽", layout="wide")
+
+
+def imagem_base64(caminho: Path) -> str:
+    """Imagem local embutida no HTML (o st.markdown não lê arquivos do disco)."""
+    return "data:image/png;base64," + base64.b64encode(caminho.read_bytes()).decode() if caminho.exists() else ""
+
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { font-family: 'Montserrat', sans-serif !important; }
+
+/* Topo: espaço para o cabeçalho; barra do Streamlit transparente e sem "Deploy" */
+.block-container { padding-top: 3.8rem; max-width: 1200px; }
+[data-testid="stHeader"] { background: transparent; }
+.stAppDeployButton, [data-testid="stAppDeployButton"] { display: none; }
+
+/* Barra lateral: tons mais escuros do site da Impacta */
+[data-testid="stSidebar"] { background: linear-gradient(180deg, #020D13 0%, #071C23 60%, #0D181D 100%);
+    border-right: 1px solid #1B3440; }
+[data-testid="stSidebar"] * { color: #E8EEF2; }
+[data-testid="stSidebar"] a { color: #00D8FF !important; }
+[data-testid="stSidebar"] .stButton button {
+    background: transparent; border: 1.5px solid #116FFF; border-radius: 14px; color: #FFFFFF;
+    text-align: left; font-size: 0.82rem; font-weight: 600; padding: 6px 14px; }
+[data-testid="stSidebar"] .stButton button:hover { background: #116FFF; border-color: #116FFF; }
+.lateral-titulo { font-weight: 800; letter-spacing: 1px; font-size: 0.74rem; text-transform: uppercase; color: #00D8FF !important;
+    margin: 16px 0 4px 0; }
+.lateral-texto { font-size: 0.86rem; line-height: 1.4; color: rgba(255,255,255,.85) !important; }
+
+/* Cabeçalho */
+.topo { display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    border-bottom: 1px solid #1B3440; padding-bottom: 14px; margin-bottom: 12px; }
+.topo > div:first-child { flex: 1; min-width: 0; }
+.titulo { color: #FFFFFF; font-size: 1.9rem; font-weight: 900; line-height: 1.12; text-transform: uppercase; letter-spacing: .5px; }
+@media (max-width: 900px) { .topo { flex-direction: column; align-items: flex-start; } }
+.titulo span { color: #116FFF; }
+.subtitulo { color: #00D8FF; font-weight: 600; font-size: 1rem; margin-top: 6px; }
+.logos { display: flex; align-items: center; gap: 14px; background: #FFFFFF; border-radius: 14px; padding: 8px 14px;
+    flex-shrink: 0; }
+.logos img.impacta { height: 44px; }
+.logos .nome-impacta { color: #1E5A7A; font-weight: 900; letter-spacing: 1px; font-size: 1.05rem; line-height: 1.05; }
+.logos .nome-impacta small { display: block; font-weight: 600; font-size: .62rem; letter-spacing: .5px; color: #4A6B7C; }
+.logos .sep { width: 1px; height: 40px; background: #D5DEE3; }
+.logos img.anp { height: 46px; }
+.chips { margin: 4px 0 16px 0; }
+.chip { display: inline-block; border: 1.5px solid #116FFF; color: #FFFFFF; border-radius: 50px;
+    padding: 4px 14px; margin: 4px 8px 4px 0; font-size: 0.80rem; font-weight: 600; background: rgba(17,111,255,.10); }
+
+/* Faixa de destaque e cartões */
+.destaque { background: linear-gradient(100deg, #116FFF 0%, #0A88F4 55%, #00D8FF 100%); color: #FFFFFF;
+    border-radius: 16px; padding: 18px 26px; font-size: 1.1rem; font-weight: 700; line-height: 1.45;
+    box-shadow: 0 6px 24px rgba(17,111,255,.35); margin-bottom: 18px; }
+.cartoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 18px; }
+.cartao { background: #13252D; border: 1px solid #1B3440; border-radius: 18px; padding: 16px 20px; border-top: 4px solid #116FFF; }
+.cartao.ciano { border-top-color: #00D8FF; } .cartao.vermelho { border-top-color: #F44336; }
+.cartao h4 { color: #FFFFFF; margin: 0 0 8px 0; font-size: 0.95rem; text-transform: uppercase; letter-spacing: .5px; font-weight: 800; }
+.cartao ul { margin: 0; padding-left: 18px; color: rgba(255,255,255,.80); font-size: 0.88rem; }
+@media (max-width: 900px) { .cartoes { grid-template-columns: 1fr; } }
+
+/* Mensagens da conversa */
+[data-testid="stChatMessage"] { background: #10222A; border: 1px solid #1B3440; border-radius: 16px; padding: 12px 16px; }
+.classe { display: inline-block; color: #FFFFFF; font-weight: 700; font-size: 0.76rem; border-radius: 50px;
+    padding: 3px 12px; margin-bottom: 6px; }
+.aviso-esclarecer { border: 1.5px dashed #FF8A00; background: rgba(255,138,0,.10); border-radius: 12px;
+    padding: 10px 14px; margin: 8px 0; font-size: 0.92rem; }
+.rodape-resposta { color: #8FA6B2; font-size: 0.78rem; margin-top: 4px; }
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# Funções de apresentação
+# ---------------------------------------------------------------------------
+def texto_seguro(texto: str) -> str:
+    """O Streamlit trata '$...$' como fórmula matemática: escapa o cifrão de 'R$'."""
+    return (texto or "").replace("$", "\\$")
+
+
+def grafico_automatico(df: pd.DataFrame) -> None:
+    """Gráfico feito pelo CÓDIGO (sem LLM): linha para séries mensais, barras para comparar poucos itens."""
+    if df.empty or len(df) < 2:
+        return
+    numericas = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and not pd.api.types.is_bool_dtype(df[c])]
+    preferidas = [c for c in numericas if any(p in c.lower() for p in ("preco", "media", "variacao", "pct", "diferenca", "razao"))]
+    metrica = (preferidas or [c for c in numericas if not any(p in c.lower() for p in ("ano", "trimestre", "mes"))] or [None])[0]
+    if not metrica:
+        return
+    tempo = next((c for c in df.columns if c.lower() in ("ano_mes", "mes", "mes_pesquisa")), None)
+    if tempo and df[tempo].nunique() == len(df):
+        # Linha: eixo Y ajustado à faixa dos dados (zero=False), senão a variação de centavos some
+        grafico = alt.Chart(df.sort_values(tempo)).mark_line(point=True, color="#00D8FF", strokeWidth=3).encode(
+            x=alt.X(f"{tempo}:O", title=tempo), y=alt.Y(f"{metrica}:Q", scale=alt.Scale(zero=False), title=metrica),
+            tooltip=[tempo, metrica])
+        st.altair_chart(grafico, use_container_width=True)
+        return
+    categoria = next((c for c in df.columns if df[c].dtype == object and df[c].nunique() == len(df)), None)
+    if categoria and len(df) <= 30:
+        # Barras: eixo começa no zero (o comprimento da barra representa o valor)
+        grafico = alt.Chart(df).mark_bar(color="#116FFF", cornerRadiusEnd=4).encode(
+            x=alt.X(f"{categoria}:N", sort=None, title=categoria),   # mantém a ordem do SQL (ranking)
+            y=alt.Y(f"{metrica}:Q", title=metrica), tooltip=[categoria, metrica])
+        st.altair_chart(grafico, use_container_width=True)
+
+
+def mostrar_resposta(res: dict) -> None:
+    nome, cor, _ = CLASSES.get(res["classe"], (res["classe"], "#5B6B82", ""))
+    st.markdown(f'<span class="classe" style="background:{cor}">{nome}</span>', unsafe_allow_html=True)
+    st.markdown(texto_seguro(res["resposta"]))
+    if res["classe"] == "ESCLARECIMENTO":
+        # Deixa claro que a resposta vem DEPOIS que o usuário esclarecer (não é uma falha)
+        st.markdown('<div class="aviso-esclarecer">👉 <b>Para eu buscar o preço, responda na caixa abaixo</b> '
+                    '(por exemplo: <i>"o município"</i> ou <i>"o estado"</i>). Eu lembro da sua pergunta anterior '
+                    'e completo a consulta.</div>', unsafe_allow_html=True)
+    if res.get("linhas"):
+        df = pd.DataFrame(res["linhas"], columns=res["colunas"])
+        st.dataframe(df, hide_index=True)
+        st.download_button("⬇️ Baixar tabela (CSV)", df.to_csv(index=False).encode("utf-8-sig"),
+                           file_name="resultado.csv", mime="text/csv", key=f"csv_{id(res)}")
+        grafico_automatico(df)
+        st.markdown("**SQL usado** (somente leitura, validado antes de executar):")
+        st.code(res["sql"], language="sql")
+    with st.expander("🔎 Detalhes da execução"):
+        if res.get("pergunta_completa") and res["classe"] == "DADOS":
+            st.markdown(f"**Pergunta interpretada pelo Orquestrador:** {texto_seguro(res['pergunta_completa'])}")
+        if res.get("ressalvas"):
+            st.markdown("**Ressalvas detectadas pelo sistema:**\n" + "\n".join(f"- {texto_seguro(r)}" for r in res["ressalvas"]))
+        if res.get("tentativas_run_sql"):
+            st.markdown(f"**Execuções de SQL:** {res['tentativas_run_sql']} · válido na 1ª tentativa: "
+                        f"{'sim' if res.get('sql_ok_1a_tentativa') else 'não'}")
+        linhas = [f"| {a} | {u['tempo_s']} s | {u['chamadas_llm']} | US\\$ {u['custo_usd']:.4f} |"
+                  for a, u in (res.get("uso_por_agente") or {}).items()]
+        if linhas:
+            st.markdown("| Agente | Tempo | Chamadas à LLM | Custo |\n|---|---|---|---|\n" + "\n".join(linhas))
+    st.markdown(f'<div class="rodape-resposta">⏱️ {res["tempo_s"]} s · 💲 US$ {res["uso"]["custo_usd"]:.4f}</div>',
+                unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# Estado da sessão
+# ---------------------------------------------------------------------------
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = []          # [{"papel": "usuario"/"assistente", "texto": str, "res": dict}]
+    st.session_state.custo_sessao = 0.0
+    st.session_state.pendente = None         # pergunta vinda de um botão de exemplo
+
+# ---------------------------------------------------------------------------
+# Barra lateral
+# ---------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown('<div class="lateral-titulo">Projeto</div>'
+                f'<div class="lateral-texto"><b>{PROJETO}</b><br>{SUBTITULO}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lateral-titulo">Desenvolvedores</div><div class="lateral-texto">'
+                + "<br>".join(DESENVOLVEDORES) + "</div>", unsafe_allow_html=True)
+    st.markdown('<div class="lateral-titulo">Fonte dos dados</div>'
+                f'<div class="lateral-texto"><a href="{FONTE_URL}" target="_blank">ANP — Série Histórica de Preços '
+                'de Combustíveis</a><br>jan/2020 a jun/2026 · amostra de postos</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="lateral-titulo">Experimente perguntar</div>', unsafe_allow_html=True)
+    for i, exemplo in enumerate(EXEMPLOS):
+        if st.button(exemplo, key=f"ex_{i}", use_container_width=True):
+            st.session_state.pendente = exemplo
+
+    st.markdown('<div class="lateral-titulo">Agentes e modelos</div><div class="lateral-texto">'
+                f'🧭 Orquestrador: {llm.MODELOS["orquestrador"]}<br>🧮 Agente SQL: {llm.MODELOS["sql"]}<br>'
+                f'✍️ Analista: {llm.MODELOS["analista"]}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lateral-titulo">Gasto desta sessão</div>', unsafe_allow_html=True)
+    gasto_sessao = st.empty()      # atualizado no lugar depois de cada resposta (sem recarregar a página)
+    gasto_sessao.markdown(f'<div class="lateral-texto">US$ {st.session_state.custo_sessao:.4f}</div>',
+                          unsafe_allow_html=True)
+    st.write("")
+    if st.button("🗑️ Nova conversa", use_container_width=True):
+        st.session_state.mensagens, st.session_state.custo_sessao, st.session_state.pendente = [], 0.0, None
+        st.rerun()
+
+# ---------------------------------------------------------------------------
+# Cabeçalho: título do projeto + logos + curso, matéria e professor
+# ---------------------------------------------------------------------------
+logo_impacta, logo_anp = imagem_base64(LOGO_IMPACTA), imagem_base64(LOGO_ANP)
+bloco_logos = (
+    '<div class="logos">'
+    + (f'<img class="impacta" src="{logo_impacta}" alt="Faculdade Impacta">' if logo_impacta else "")
+    + '<div class="nome-impacta">IMPACTA<small>Faculdade de Tecnologia</small></div>'
+    + '<div class="sep"></div>'
+    + (f'<img class="anp" src="{logo_anp}" alt="ANP — fonte dos dados">' if logo_anp else '<b style="color:#00A651">ANP</b>')
+    + "</div>")
+st.markdown(f"""
+<div class="topo">
+  <div>
+    <div class="titulo">Analista Virtual de <span>Preços de Combustíveis</span></div>
+    <div class="subtitulo">{SUBTITULO}</div>
+  </div>
+  {bloco_logos}
+</div>
+<div class="chips">
+  <span class="chip">🎓 {CURSO}</span><span class="chip">📘 Matéria: {MATERIA}</span><span class="chip">👨‍🏫 {PROFESSOR}</span>
+</div>
+""", unsafe_allow_html=True)
+
+APRESENTACAO = """
+<div class="destaque">Pergunte em português sobre preços de combustíveis no Brasil. Três agentes de IA consultam a
+base da ANP com SQL e respondem com texto, tabela e o SQL usado.</div>
+<div class="cartoes">
+  <div class="cartao"><h4>O que responde</h4><ul>
+    <li>Preço médio por município, estado, região ou Brasil</li>
+    <li>Preço atual de um posto ou CEP</li>
+    <li>Rankings, evolução no tempo e variação %</li>
+    <li>Etanol × gasolina (regra dos 70%) e bandeira × posto sem bandeira</li></ul></div>
+  <div class="cartao ciano"><h4>Como responde</h4><ul>
+    <li>🧭 Orquestrador entende e busca o contexto</li>
+    <li>🧮 Agente SQL consulta (somente leitura)</li>
+    <li>✍️ Analista explica, com o período e as ressalvas</li>
+    <li>Camada semântica com regras de negócio</li></ul></div>
+  <div class="cartao vermelho"><h4>O que NÃO faz</h4><ul>
+    <li>Não altera nem apaga dados</li>
+    <li>Não tem margem, preço de compra nem GLP</li>
+    <li>Não cobre todos os postos (é uma amostra da ANP)</li>
+    <li>Não prevê preços futuros</li></ul></div>
+</div>"""
+if st.session_state.mensagens:
+    with st.expander("ℹ️ Sobre o analista virtual"):
+        st.markdown(APRESENTACAO, unsafe_allow_html=True)
+else:
+    st.markdown(APRESENTACAO, unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Conversa
+# ---------------------------------------------------------------------------
+for msg in st.session_state.mensagens:
+    with st.chat_message("user" if msg["papel"] == "usuario" else "assistant",
+                         avatar="🧑" if msg["papel"] == "usuario" else "⛽"):
+        if msg["papel"] == "usuario":
+            st.markdown(texto_seguro(msg["texto"]))
+        else:
+            mostrar_resposta(msg["res"])
+
+digitada = st.chat_input("Pergunte sobre preços de combustíveis… (ex.: quanto está o diesel em Curitiba?)",
+                         max_chars=MAX_CARACTERES)
+pergunta = digitada or st.session_state.pendente
+st.session_state.pendente = None
+
+if pergunta:
+    historico = [{"pergunta": u["texto"], "resposta": a["res"]["resposta"]}
+                 for u, a in zip(st.session_state.mensagens[::2], st.session_state.mensagens[1::2])][-TURNOS_HISTORICO:]
+    st.session_state.mensagens.append({"papel": "usuario", "texto": pergunta})
+    with st.chat_message("user", avatar="🧑"):
+        st.markdown(texto_seguro(pergunta))
+    with st.chat_message("assistant", avatar="⛽"):
+        with st.status("Analisando a pergunta…", expanded=True) as status:
+            def ao_etapa(etapa: str) -> None:
+                status.update(label=ETAPAS[etapa])
+                st.write(ETAPAS[etapa])
+            try:
+                res = orchestrator.responder(pergunta, historico, ao_etapa=ao_etapa)
+                rotulo = CLASSES.get(res["classe"], ("", "", "Pronto"))[2]
+                status.update(label=f"{rotulo} ({res['tempo_s']} s)", state="complete", expanded=False)
+            except llm.ErroLLM as erro:
+                status.update(label="Não foi possível responder", state="error")
+                st.session_state.mensagens.pop()        # tira a pergunta sem resposta do histórico
+                st.error(f"⚠️ {erro}")
+                st.stop()
+        mostrar_resposta(res)
+    st.session_state.mensagens.append({"papel": "assistente", "texto": res["resposta"], "res": res})
+    st.session_state.custo_sessao += res["uso"]["custo_usd"]
+    # Atualiza só o gasto na barra lateral (um st.rerun() levaria a página de volta ao topo da conversa)
+    gasto_sessao.markdown(f'<div class="lateral-texto">US$ {st.session_state.custo_sessao:.4f}</div>',
+                          unsafe_allow_html=True)

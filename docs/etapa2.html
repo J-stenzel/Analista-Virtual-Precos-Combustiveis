@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<!-- Fonte do PDF da Etapa 2. Gerar com:
+     python docs/templates/gerar_pdf.py docs/etapa2.html docs/Etapa2_Preparacao_e_Modelagem.pdf -->
+<style>
+@page {
+  size: A4;
+  margin: 12mm 17mm 16mm 17mm;
+  @bottom-left { content: "Projeto Final — Do BI ao Analista Virtual · Etapa 2"; font: 8pt "DejaVu Sans"; color: #888; border-top: 0.5pt solid #ccc; padding-top: 4pt; vertical-align: top; }
+  @bottom-right { content: "Página " counter(page); font: 8pt "DejaVu Sans"; color: #888; border-top: 0.5pt solid #ccc; padding-top: 4pt; vertical-align: top; }
+}
+body { font-family: "DejaVu Sans", sans-serif; font-size: 8.4pt; line-height: 1.28; color: #111; }
+h1 { color: #1F4E79; font-size: 18pt; line-height: 1.15; margin: 0 0 3pt 0; }
+.sub { color: #555; font-size: 11pt; margin: 0 0 2pt 0; }
+.disc { color: #666; font-size: 8.4pt; margin: 0 0 5pt 0; }
+h2 { color: #1F4E79; font-size: 12pt; margin: 7pt 0 3pt 0; }
+p { margin: 0 0 4pt 0; }
+.box { background: #E8EFF8; border-left: 4pt solid #1F4E79; padding: 5pt 8pt; margin: 4pt 0 6pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 3pt 0 4pt 0; font-size: 7.9pt; }
+th { background: #1F4E79; color: #fff; text-align: left; padding: 3pt 5pt; font-weight: bold; }
+td { border: 0.5pt solid #c9d3df; padding: 2.5pt 5pt; vertical-align: top; }
+tr:nth-child(even) td { background: #EEF3FA; }
+td.n { text-align: right; white-space: nowrap; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 7.6pt; }
+pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.1pt; line-height: 1.25; background: #F3F3F3;
+      border: 0.5pt solid #ddd; padding: 4pt 6pt; margin: 3pt 0 5pt 0; white-space: pre-wrap; }
+ul, ol { margin: 2pt 0 4pt 0; padding-left: 16pt; }
+li { margin-bottom: 1.5pt; }
+.small { font-size: 8pt; color: #333; }
+h2, h3 { break-after: avoid; }
+table, pre, .box { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<h1>Etapa 2: Preparação e Modelagem</h1>
+<p class="sub">Analista Virtual de Preços de Combustíveis — scripts de carga e camada semântica</p>
+<p class="disc">Disciplina de Inteligência Artificial · Projeto Final “Do BI ao Analista Virtual”<br>
+<b>Grupo:</b> Douglas H. da Silva, Jeferson Stenzel, Leonardo M. L. Rodrigues e Leonardo M. Lima</p>
+
+<h2>1. Resumo da entrega</h2>
+<div class="box"><b>Entregáveis:</b> <code>src/load_data.py</code> (leitura, limpeza, modelo estrela e 15 testes de qualidade)
+→ banco DuckDB <code>data/processed/combustiveis.duckdb</code> (~40 MB, recriável em ~30 s) ·
+<code>src/semantic_layer.yaml</code> (camada semântica com 6 seções) ·
+<code>tests/testar_camada_semantica.py</code> (89 verificações automáticas, todas aprovadas) ·
+<code>notebooks/perguntas_negocio.ipynb</code> (SQL de referência das 10 perguntas, alinhado às regras).</div>
+
+<h2>2. Carga e limpeza (<code>load_data.py</code>)</h2>
+<table>
+<tr><th>Problema encontrado nos 13 CSVs da ANP</th><th>Tratamento</th></tr>
+<tr><td>Arquivos com codificações diferentes (UTF-8 e latin-1)</td><td>Detecção automática por arquivo antes da leitura</td></tr>
+<tr><td>9.114 linhas totalmente vazias (arquivo 2025.01)</td><td>Removidas</td></tr>
+<tr><td>CNPJ com pontuação; unidade do GNV escrita como “m3”</td><td>CNPJ só com 14 dígitos; unidade padronizada para R$/m³</td></tr>
+<tr><td>A mesma distribuidora com nomes diferentes ao longo do tempo</td><td>Unificadas: Petrobras Distribuidora / Vibra Energia → <b>VIBRA</b>; Alesat → <b>ALE</b>; Federal → <b>FEDERAL ENERGIA</b>; Total Brasil → <b>TOTALENERGIES</b></td></tr>
+<tr><td>Coluna “Valor de Compra” só existe até ago/2020</td><td>Descartada (a base não permite calcular margem)</td></tr>
+<tr><td>20 casos com mais de um preço para o mesmo posto, produto e data</td><td>Média dos preços, registrando quantos eram (<code>qtd_registros_origem</code>)</td></tr>
+<tr><td>Staging no arquivo final inflava o banco para ~535 MB</td><td>Staging feito em memória; só o modelo estrela vai para o arquivo</td></tr>
+</table>
+
+<h2>3. Modelo estrela e relacionamentos</h2>
+<table>
+<tr><th>Tabela</th><th style="text-align:right">Linhas</th><th>Conteúdo</th><th>Ligação com a fato</th></tr>
+<tr><td><code>fato_precos</code></td><td class="n">5.463.890</td><td>1 preço de 1 produto, em 1 posto, em 1 data (grão: data + cnpj + id_produto)</td><td>—</td></tr>
+<tr><td><code>dim_tempo</code></td><td class="n">2.373</td><td>Calendário diário (inclui 709 dias sem coleta)</td><td>N:1 por <code>data</code></td></tr>
+<tr><td><code>dim_local</code></td><td class="n">471</td><td>Região → UF → município (27 UFs)</td><td>N:1 por <code>id_local</code></td></tr>
+<tr><td><code>dim_produto</code></td><td class="n">6</td><td>Gasolina, gasolina aditivada, etanol, diesel, diesel S10, GNV + unidade</td><td>N:1 por <code>id_produto</code></td></tr>
+<tr><td><code>dim_bandeira</code></td><td class="n">76</td><td>Bandeira padronizada + flag <code>eh_bandeira_branca</code></td><td>N:1 por <code>id_bandeira</code></td></tr>
+<tr><td><code>dim_posto</code></td><td class="n">21.103</td><td>Razão social, bairro, CEP, 1ª e última coleta (dados mais recentes)</td><td>N:1 por <code>cnpj</code></td></tr>
+</table>
+<p class="small"><b>Decisão de modelagem:</b> bandeira e município ficam na <b>fato</b> (valor na data da coleta), não no cadastro do posto:
+<b>3.322 postos trocaram de bandeira</b> e <b>16 trocaram de município</b> no período. Os 5 JOINs juntos mantêm as 5.463.890 linhas
+(nenhuma perdida nem duplicada).</p>
+
+<h2>4. Testes de qualidade</h2>
+<p>O <code>load_data.py</code> roda <b>15 testes</b> a cada carga e grava o relatório em <code>docs/qualidade_dados.md</code>:</p>
+<table>
+<tr><th>Grupo de testes</th><th>Resultado</th></tr>
+<tr><td>Nulos nas chaves da fato · duplicatas no grão · CNPJ com 14 dígitos</td><td>0 problemas ✅</td></tr>
+<tr><td>Chaves órfãs da fato nas 5 dimensões (data, cnpj, local, produto, bandeira)</td><td>0 órfãs ✅</td></tr>
+<tr><td>Produto sem tipo · região sem nome · UF em mais de uma região</td><td>0 problemas ✅</td></tr>
+<tr><td>Preço fora da faixa plausível (R$ 0,50 a R$ 20,00)</td><td>0 casos ✅</td></tr>
+<tr><td>Meses sem nenhuma coleta (alerta)</td><td>1 mês: <b>set/2020</b> ⚠️ (lacuna da ANP; citada como ressalva)</td></tr>
+</table>
+
+<h2>5. Camada semântica (<code>semantic_layer.yaml</code>)</h2>
+<p>O “conhecimento do analista de BI” escrito para a LLM: os agentes o consultam (<code>get_schema()</code>, <code>get_metric()</code>) antes de gerar SQL.</p>
+<table>
+<tr><th>Seção</th><th>Conteúdo</th></tr>
+<tr><td><code>projeto</code></td><td>O que a base é e o que <b>não</b> tem (margem, volume vendido, GLP, todos os postos)</td></tr>
+<tr><td><code>tabelas</code></td><td>6 tabelas com grão, chave e descrição de negócio de cada coluna</td></tr>
+<tr><td><code>relacionamentos</code></td><td>5 JOINs N:1 prontos, apelidos padrão (<code>f, t, p, l, pr, b</code>) e 3 joins proibidos</td></tr>
+<tr><td><code>metricas</code></td><td>10 métricas definidas uma vez: preço médio, mínimo, máximo, amplitude, nº de postos, nº de coletas,
+período da amostra, variação %, razão etanol/gasolina, diferença bandeira × branca — com SQL de exemplo testado</td></tr>
+<tr><td><code>sinonimos</code></td><td>Palavras do usuário → valores exatos da base (álcool → ETANOL, posto BR → VIBRA, Floripa → FLORIANOPOLIS/SC,
+27 UFs…), <b>termos ambíguos</b> (pedir esclarecimento) e <b>termos fora da base</b> (recusar com educação)</td></tr>
+<tr><td><code>regras_de_negocio</code></td><td>14 regras (R01–R14) com SQL, um <b>checklist</b> para o Agente SQL e <b>ressalvas</b> para o Agente Analista</td></tr>
+</table>
+
+<p><b>Exemplo — a métrica de preço médio no YAML:</b></p>
+<pre>preco_medio:
+  descricao: "Preço médio de venda = média das médias de cada posto no recorte (cada posto pesa igual)."
+  expressao_sql: "ROUND(AVG(preco_posto), 3)  -- sobre a CTE por_posto (ver padrao_media_por_posto)"
+  unidade: "R$/litro (GNV: R$/m³)"
+  exige: ["filtro ou GROUP BY de produto", "CTE por_posto agrupada por cnpj + dimensões do resultado"]</pre>
+
+<p><b>Principais decisões do grupo registradas na camada semântica:</b></p>
+<table>
+<tr><th>Regra</th><th>Definição</th></tr>
+<tr><td>Preço médio (R13)</td><td><b>Média por posto</b> (cada posto pesa igual); mínimo, máximo e amplitude usam as coletas (preços reais)</td></tr>
+<tr><td>Datas relativas (R01)</td><td>“Atual”, “último mês”, “ano passado” contam a partir da <b>última data da base</b> (30/06/2026), nunca do relógio</td></tr>
+<tr><td>Preço atual (R02, R04)</td><td>Posto/CEP: última coleta daquele posto para o produto. Local: último mês com pesquisa no recorte</td></tr>
+<tr><td>Rankings (R05)</td><td>Último trimestre com pesquisa na base (o mesmo para todos) e mínimo de 5 postos por local</td></tr>
+<tr><td>Coleta recente e antiga (R06, R07)</td><td>Recente = últimos 3 meses com dados; coleta anterior a isso é mostrada <b>com aviso</b> e a data</td></tr>
+<tr><td>Etanol compensa (R08)</td><td>Etanol ÷ gasolina ≤ 0,70 no <b>mesmo posto e mesma data</b> (nunca média ÷ média da cidade)</td></tr>
+<tr><td>Transparência (R09)</td><td>Toda resposta sobre “atual/recente” informa a data ou o período da pesquisa</td></tr>
+<tr><td>Filtros (R10–R12)</td><td>“Gasolina” = comum; nunca misturar R$/litro com GNV (R$/m³); município sempre com UF, sem acento</td></tr>
+</table>
+
+<h2>6. Validação</h2>
+<ul>
+<li><b><code>tests/testar_camada_semantica.py</code> — 89 verificações aprovadas:</b> estrutura do YAML; todo SQL de exemplo roda;
+todo valor dos sinônimos existe no banco (evita o filtro que “roda mas volta vazio”); métricas <b>recalculadas em pandas a partir
+das linhas brutas</b> batem com o SQL do YAML.</li>
+<li><b>Armadilhas encontradas ao conferir a base:</b> existe a bandeira <b>PETROBRASIL</b> (≠ Petrobras), as bandeiras “SP” e “RIO BRANCO”,
+e o município <b>POA</b> (Poá/SP) — por isso os filtros usam “=” no valor exato e esses termos pedem esclarecimento.</li>
+<li><b>Notebook das 10 perguntas</b> atualizado para as regras R01–R14 e reexecutado sem erros. A troca para média por posto mudou
+resultados: na variação da gasolina do 1º sem/2025 ao 1º sem/2026 (pergunta 9), o <b>Amapá subiu de 5º para 3º</b> (+6,50% → +7,59%).
+Por isso o gabarito do golden set é gerado <b>depois</b> de fechar as regras.</li>
+</ul>
+
+<h2>7. Ressalvas e próximos passos</h2>
+<div class="box"><b>Ressalvas:</b> a ANP pesquisa uma <b>amostra</b> de postos e municípios (não todos); não há coleta em <b>set/2020</b>;
+2026 vai só até 30/06; preços muito altos ou baixos <b>não são removidos nem marcados</b> — entram no cálculo e o usuário avalia.<br>
+<b>Próximos passos:</b> montar o <b>golden set</b> (20 perguntas com SQL de referência escrito à mão, antes de qualquer prompt) e
+iniciar a Etapa 3 com <b>um agente de ponta a ponta</b> usando as tools <code>get_schema</code>, <code>get_metric</code>,
+<code>validate_sql</code> e <code>run_sql</code> sobre esta camada semântica.</div>
+
+</body>
+</html>

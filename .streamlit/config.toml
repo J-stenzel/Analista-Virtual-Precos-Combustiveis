@@ -1,0 +1,15 @@
+# Tema do app — identidade visual inspirada no site da Faculdade Impacta (impacta.edu.br):
+# fundo quase preto azulado, azul vibrante, destaque ciano, fonte Montserrat (carregada no CSS do app)
+[theme]
+base = "dark"
+primaryColor = "#116FFF"              # azul dos botões do site
+backgroundColor = "#0D181D"           # fundo principal do site
+secondaryBackgroundColor = "#13252D"  # painéis, caixas e tabelas
+textColor = "#E8EEF2"                 # texto claro sobre fundo escuro
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

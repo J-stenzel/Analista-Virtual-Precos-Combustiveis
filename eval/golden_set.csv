@@ -1,0 +1,355 @@
+﻿id,nivel,pergunta,sql_referencia,resposta_esperada,regras_testadas,colunas_chave
+1,facil,Qual é o preço atual da gasolina no CEP 03210-001?,"WITH janela AS (                 -- início da janela de ""coleta recente"" (R06/R07)
+    SELECT CAST(date_trunc('month', MAX(data)) - INTERVAL 2 MONTH AS DATE) AS inicio FROM fato_precos
+)
+SELECT p.razao_social, p.bairro, p.cep, b.bandeira,
+       f.valor_venda AS preco_gasolina,
+       f.data        AS data_pesquisa,
+       f.data < (SELECT inicio FROM janela) AS coleta_antiga          -- R07: avisar o usuário
+FROM fato_precos f
+JOIN dim_posto p    ON p.cnpj        = f.cnpj
+JOIN dim_produto pr ON pr.id_produto = f.id_produto
+JOIN dim_bandeira b ON b.id_bandeira = f.id_bandeira               -- bandeira NA DATA da coleta
+WHERE regexp_replace(p.cep, '[^0-9]', '', 'g') = regexp_replace('03210-001', '[^0-9]', '', 'g')   -- R03
+  AND pr.produto = 'GASOLINA'
+QUALIFY ROW_NUMBER() OVER (PARTITION BY f.cnpj ORDER BY f.data DESC) = 1   -- R02: última coleta de cada posto","Trapézio Auto Posto Ltda (Vila Alpina, bandeira RAIZEN): gasolina R$ 4,94 na coleta de 12/09/2022. Coleta ANTIGA (anterior à janela de coleta recente abr-jun/2026): a resposta deve avisar e informar a data (R07).",R02 R03 R07,"razao_social,preco_gasolina"
+2,facil,Qual é o preço médio do diesel S10 no estado do Paraná no último mês com pesquisa?,"WITH recorte AS (
+    SELECT f.cnpj, f.data, f.valor_venda, t.ano_mes
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE l.uf = 'PR' AND pr.produto = 'DIESEL S10'
+),
+ultimo_mes AS (                 -- R04: último mês com pesquisa NO RECORTE
+    SELECT * FROM recorte WHERE ano_mes = (SELECT MAX(ano_mes) FROM recorte)
+),
+por_posto AS (                  -- R13: média de cada posto no mês
+    SELECT cnpj, AVG(valor_venda) AS preco_posto FROM ultimo_mes GROUP BY cnpj
+)
+SELECT MAX(ano_mes)                                       AS mes_pesquisa,
+       (SELECT ROUND(AVG(preco_posto), 3) FROM por_posto) AS preco_medio_diesel_s10,
+       COUNT(DISTINCT cnpj)                               AS postos_pesquisados,
+       MIN(data) AS primeira_coleta, MAX(data) AS ultima_coleta
+FROM ultimo_mes","R$ 7,044/litro: média por posto de 263 postos do PR em jun/2026 (coletas de 01/06 a 30/06/2026).",R04 R13,"mes_pesquisa,preco_medio_diesel_s10"
+3,facil,Quantos postos foram pesquisados em Curitiba no último mês com pesquisa?,"WITH recorte AS (
+    SELECT f.cnpj, f.data, t.ano_mes
+    FROM fato_precos f
+    JOIN dim_tempo t ON t.data     = f.data
+    JOIN dim_local l ON l.id_local = f.id_local
+    WHERE l.uf = 'PR' AND l.municipio = 'CURITIBA'          -- R12: município sempre com UF
+)
+SELECT ano_mes              AS mes_pesquisa,
+       COUNT(DISTINCT cnpj) AS postos_pesquisados,        -- postos distintos, não coletas
+       MIN(data)            AS primeira_coleta,
+       MAX(data)            AS ultima_coleta
+FROM recorte
+WHERE ano_mes = (SELECT MAX(ano_mes) FROM recorte)        -- R04: último mês com pesquisa em Curitiba
+GROUP BY ano_mes",62 postos pesquisados em Curitiba em jun/2026 (coletas de 01/06 a 24/06/2026).,R04 R12,"mes_pesquisa,postos_pesquisados"
+4,facil,Qual foi o preço médio do álcool em Fortaleza em maio de 2026?,"WITH por_posto AS (             -- R13: média de cada posto no mês
+    SELECT f.cnpj, AVG(f.valor_venda) AS preco_posto, MIN(f.data) AS d1, MAX(f.data) AS d2
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto = 'ETANOL'                              -- sinônimo: álcool -> ETANOL
+      AND l.municipio = 'FORTALEZA' AND l.uf = 'CE'          -- R12: município com UF
+      AND t.ano_mes = '2026-05'
+    GROUP BY f.cnpj
+)
+SELECT ROUND(AVG(preco_posto), 3) AS preco_medio_etanol,
+       COUNT(*)                   AS postos_pesquisados,
+       MIN(d1) AS primeira_coleta, MAX(d2) AS ultima_coleta
+FROM por_posto","R$ 5,193/litro (álcool = ETANOL): 59 postos de Fortaleza/CE, coletas de 04/05 a 26/05/2026.",sinonimos R12 R13,preco_medio_etanol
+5,facil,Qual foi o preço médio do GNV no estado do Rio de Janeiro em 2025?,"WITH por_posto AS (             -- R13: média de cada posto no ano
+    SELECT f.cnpj, AVG(f.valor_venda) AS preco_posto
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto = 'GNV' AND l.uf = 'RJ' AND t.ano = 2025
+    GROUP BY f.cnpj
+)
+SELECT ROUND(AVG(preco_posto), 3) AS preco_medio_gnv,
+       'R$ / m³'                  AS unidade,                 -- R11: GNV é por m³, não por litro
+       COUNT(*)                   AS postos_pesquisados
+FROM por_posto","R$ 4,710 por m³ (GNV é medido em m³, não em litro): 264 postos do estado do RJ em 2025.",R11 R13,preco_medio_gnv
+6,facil,Qual foi o maior preço da gasolina aditivada coletado em Manaus em março de 2026?,"WITH recorte AS (
+    SELECT f.cnpj, f.data, f.valor_venda
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto = 'GASOLINA ADITIVADA'                  -- R10: aditivada só quando pedida
+      AND l.municipio = 'MANAUS' AND l.uf = 'AM'
+      AND t.ano_mes = '2026-03'
+)
+SELECT MAX(valor_venda) AS preco_maximo,                     -- máximo sobre as COLETAS (preço real)
+       COUNT(DISTINCT cnpj) FILTER (WHERE valor_venda = (SELECT MAX(valor_venda) FROM recorte)) AS postos_com_preco_maximo,
+       COUNT(DISTINCT cnpj) AS postos_pesquisados,
+       MIN(data) AS primeira_coleta, MAX(data) AS ultima_coleta
+FROM recorte","R$ 7,79/litro, cobrado por 10 dos 51 postos pesquisados em Manaus/AM em mar/2026 (coletas de 02/03 a 31/03/2026).",R10 preco_maximo,preco_maximo
+7,facil,Quantos postos de bandeira Ipiranga foram pesquisados em Santa Catarina no 1º semestre de 2026?,"SELECT COUNT(DISTINCT f.cnpj) AS postos_pesquisados,
+       MIN(f.data) AS primeira_coleta, MAX(f.data) AS ultima_coleta
+FROM fato_precos f
+JOIN dim_bandeira b ON b.id_bandeira = f.id_bandeira       -- bandeira NA DATA da coleta
+JOIN dim_local l    ON l.id_local    = f.id_local
+JOIN dim_tempo t    ON t.data        = f.data
+WHERE b.bandeira = 'IPIRANGA' AND l.uf = 'SC'
+  AND t.ano = 2026 AND t.semestre = 1",100 postos de bandeira Ipiranga em SC no 1º semestre de 2026 (coletas de 05/01 a 30/06/2026).,sinonimos num_postos,postos_pesquisados
+8,medio,Qual município do Brasil tem a maior média de preço atual da gasolina?,"WITH periodo AS (               -- R05: último trimestre com pesquisa na base
+    SELECT year(MAX(data)) AS ano, quarter(MAX(data)) AS tri FROM fato_precos
+),
+por_posto AS (                  -- R13, 1º passo: média de cada posto no trimestre
+    SELECT l.uf, l.municipio, f.cnpj, AVG(f.valor_venda) AS preco_posto,
+           MIN(f.data) AS d1, MAX(f.data) AS d2
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    JOIN periodo        ON t.ano = periodo.ano AND t.trimestre = periodo.tri
+    WHERE pr.produto = 'GASOLINA'
+    GROUP BY l.uf, l.municipio, f.cnpj
+)
+SELECT uf, municipio,           -- R13, 2º passo: média dos postos; R05: só com >= 5 postos
+       ROUND(AVG(preco_posto), 3) AS preco_medio_gasolina,
+       COUNT(*)                   AS postos_pesquisados,
+       MIN(d1) AS primeira_coleta, MAX(d2) AS ultima_coleta
+FROM por_posto
+GROUP BY uf, municipio
+HAVING COUNT(*) >= 5
+ORDER BY preco_medio_gasolina DESC
+LIMIT 1","PARINTINS/AM: R$ 9,062/litro, 9 postos, 2º trimestre de 2026 (coletas de 01/04 a 22/06/2026).",R05 R13,"uf,municipio,preco_medio_gasolina"
+9,medio,Qual município do Brasil tem a menor média de preço atual do etanol?,"WITH periodo AS (               -- R05: último trimestre com pesquisa na base
+    SELECT year(MAX(data)) AS ano, quarter(MAX(data)) AS tri FROM fato_precos
+),
+por_posto AS (                  -- R13, 1º passo: média de cada posto no trimestre
+    SELECT l.uf, l.municipio, f.cnpj, AVG(f.valor_venda) AS preco_posto,
+           MIN(f.data) AS d1, MAX(f.data) AS d2
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    JOIN periodo        ON t.ano = periodo.ano AND t.trimestre = periodo.tri
+    WHERE pr.produto = 'ETANOL'
+    GROUP BY l.uf, l.municipio, f.cnpj
+)
+SELECT uf, municipio,           -- R13, 2º passo: média dos postos; R05: só com >= 5 postos
+       ROUND(AVG(preco_posto), 3) AS preco_medio_etanol,
+       COUNT(*)                   AS postos_pesquisados,
+       MIN(d1) AS primeira_coleta, MAX(d2) AS ultima_coleta
+FROM por_posto
+GROUP BY uf, municipio
+HAVING COUNT(*) >= 5
+ORDER BY preco_medio_etanol ASC
+LIMIT 1","LINS/SP: R$ 3,458/litro, 15 postos, 2º trimestre de 2026 (coletas de 07/04 a 29/06/2026).",R05 R13,"uf,municipio,preco_medio_etanol"
+10,medio,"Como evoluiu, mês a mês, o preço médio da gasolina no Brasil em 2025?","WITH por_posto AS (             -- R13, 1º passo: média de cada posto em cada mês
+    SELECT t.ano_mes, f.cnpj, AVG(f.valor_venda) AS preco_posto
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto = 'GASOLINA' AND t.ano = 2025
+    GROUP BY t.ano_mes, f.cnpj
+),
+mensal AS (                     -- R13, 2º passo: média dos postos no mês
+    SELECT ano_mes, AVG(preco_posto) AS preco_medio, COUNT(*) AS postos_pesquisados
+    FROM por_posto
+    GROUP BY ano_mes
+)
+SELECT ano_mes,
+       ROUND(preco_medio, 3) AS preco_medio_gasolina,
+       ROUND((preco_medio / LAG(preco_medio) OVER (ORDER BY ano_mes) - 1) * 100, 2) AS variacao_pct_mes_anterior,
+       postos_pesquisados
+FROM mensal
+ORDER BY ano_mes","12 meses. Jan R$ 6,178; fev R$ 6,354 (+2,85%, maior alta); queda gradual até ago R$ 6,177; dez R$ 6,200. Ano quase estável (+0,36% de jan a dez).",R13 variacao_percentual,"ano_mes,preco_medio_gasolina"
+11,medio,Postos bandeira branca são mais baratos que os de bandeira? Mostre a diferença média da gasolina por região no último mês com pesquisa.,"WITH ultimo AS (                -- último mês com pesquisa de gasolina na base
+    SELECT MAX(t.ano_mes) AS ano_mes
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto = 'GASOLINA'
+),
+por_posto AS (                  -- R13: média de cada posto, separada por bandeira branca / com bandeira
+    SELECT l.regiao_nome, f.cnpj, b.eh_bandeira_branca, AVG(f.valor_venda) AS preco_posto,
+           MIN(f.data) AS d1, MAX(f.data) AS d2
+    FROM fato_precos f
+    JOIN dim_produto pr  ON pr.id_produto = f.id_produto
+    JOIN dim_local l     ON l.id_local    = f.id_local
+    JOIN dim_bandeira b  ON b.id_bandeira = f.id_bandeira
+    JOIN dim_tempo t     ON t.data        = f.data
+    WHERE pr.produto = 'GASOLINA' AND t.ano_mes = (SELECT ano_mes FROM ultimo)
+    GROUP BY l.regiao_nome, f.cnpj, b.eh_bandeira_branca
+)
+SELECT (SELECT ano_mes FROM ultimo) AS mes_pesquisa, regiao_nome,
+       ROUND(AVG(preco_posto) FILTER (WHERE eh_bandeira_branca), 3)     AS media_bandeira_branca,
+       ROUND(AVG(preco_posto) FILTER (WHERE NOT eh_bandeira_branca), 3) AS media_com_bandeira,
+       ROUND(AVG(preco_posto) FILTER (WHERE NOT eh_bandeira_branca)
+           - AVG(preco_posto) FILTER (WHERE eh_bandeira_branca), 3)     AS diferenca_rs,
+       ROUND((AVG(preco_posto) FILTER (WHERE NOT eh_bandeira_branca)
+            / AVG(preco_posto) FILTER (WHERE eh_bandeira_branca) - 1) * 100, 2) AS diferenca_pct,
+       COUNT(*) FILTER (WHERE eh_bandeira_branca)     AS postos_branca,
+       COUNT(*) FILTER (WHERE NOT eh_bandeira_branca) AS postos_com_bandeira,
+       MIN(d1) AS primeira_coleta, MAX(d2) AS ultima_coleta
+FROM por_posto
+GROUP BY regiao_nome
+ORDER BY diferenca_rs DESC","Jun/2026: bandeira branca mais barata em 4 regiões (Sudeste R$ 0,149 / 2,33%; Sul R$ 0,093; Norte R$ 0,079; Centro-Oeste R$ 0,048). No Nordeste a branca é MAIS CARA (diferença -R$ 0,110 / -1,57%).",R04 R13 diferenca_bandeira_vs_branca,"regiao_nome,media_bandeira_branca,media_com_bandeira"
+12,medio,"Em Belo Horizonte, qual a diferença entre o posto mais caro e o mais barato do etanol no último mês com pesquisa?","WITH recorte AS (
+    SELECT f.cnpj, f.data, f.valor_venda, t.ano_mes, p.razao_social
+    FROM fato_precos f
+    JOIN dim_tempo t    ON t.data        = f.data
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_posto p    ON p.cnpj        = f.cnpj
+    WHERE l.uf = 'MG' AND l.municipio = 'BELO HORIZONTE' AND pr.produto = 'ETANOL'
+)
+SELECT ano_mes AS mes_pesquisa,
+       MAX(valor_venda)                     AS preco_mais_caro,
+       arg_max(razao_social, valor_venda)   AS posto_mais_caro,
+       MIN(valor_venda)                     AS preco_mais_barato,
+       arg_min(razao_social, valor_venda)   AS posto_mais_barato,
+       MAX(valor_venda) - MIN(valor_venda)  AS amplitude_rs,
+       COUNT(DISTINCT cnpj)                 AS postos_pesquisados,
+       MIN(data) AS primeira_coleta, MAX(data) AS ultima_coleta
+FROM recorte
+WHERE ano_mes = (SELECT MAX(ano_mes) FROM recorte)
+GROUP BY ano_mes","Jun/2026: amplitude de R$ 1,29. Mais caro R$ 4,79 (Organizações Novo Belvedere Ltda); mais barato R$ 3,50 (Posto Allgas Ltda); 49 postos (01/06 a 30/06/2026).",R04 amplitude,amplitude_rs
+13,medio,"Ordene as regiões do Brasil pelo preço médio do diesel no último trimestre com pesquisa, do mais caro para o mais barato.","WITH periodo AS (               -- R05: último trimestre com pesquisa na base
+    SELECT year(MAX(data)) AS ano, quarter(MAX(data)) AS tri FROM fato_precos
+),
+por_posto AS (                  -- R13: média de cada posto no trimestre
+    SELECT l.regiao_nome, f.cnpj, AVG(f.valor_venda) AS preco_posto, MIN(f.data) AS d1, MAX(f.data) AS d2
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    JOIN periodo        ON t.ano = periodo.ano AND t.trimestre = periodo.tri
+    WHERE pr.produto = 'DIESEL'                              -- ""diesel"" sem detalhe = DIESEL comum
+    GROUP BY l.regiao_nome, f.cnpj
+)
+SELECT regiao_nome,
+       ROUND(AVG(preco_posto), 3) AS preco_medio_diesel,
+       COUNT(*)                   AS postos_pesquisados,
+       MIN(d1) AS primeira_coleta, MAX(d2) AS ultima_coleta
+FROM por_posto
+GROUP BY regiao_nome
+HAVING COUNT(*) >= 5
+ORDER BY preco_medio_diesel DESC","2º tri/2026 (01/04 a 30/06): Norte R$ 7,401 > Nordeste R$ 7,394 > Sudeste R$ 6,995 > Centro-Oeste R$ 6,955 > Sul R$ 6,927 (diesel = DIESEL comum).",sinonimos R05 R13,"regiao_nome,preco_medio_diesel"
+14,medio,"Em 2025, a gasolina foi mais barata nos postos Shell, BR ou Ipiranga?","WITH por_posto AS (             -- R13: média de cada posto, separada pela bandeira da época
+    SELECT b.bandeira, f.cnpj, AVG(f.valor_venda) AS preco_posto
+    FROM fato_precos f
+    JOIN dim_produto pr  ON pr.id_produto = f.id_produto
+    JOIN dim_bandeira b  ON b.id_bandeira = f.id_bandeira
+    JOIN dim_tempo t     ON t.data        = f.data
+    WHERE pr.produto = 'GASOLINA' AND t.ano = 2025
+      AND b.bandeira IN ('RAIZEN', 'VIBRA', 'IPIRANGA')      -- Shell -> RAIZEN, BR -> VIBRA
+    GROUP BY b.bandeira, f.cnpj
+)
+SELECT bandeira,
+       ROUND(AVG(preco_posto), 3) AS preco_medio_gasolina,
+       COUNT(*)                   AS postos_pesquisados
+FROM por_posto
+GROUP BY bandeira
+ORDER BY preco_medio_gasolina ASC","2025, gasolina comum: Shell (RAIZEN) R$ 6,240 < Ipiranga R$ 6,291 < BR (VIBRA) R$ 6,343. A mais barata foi a Shell (RAIZEN).",sinonimos R05 R13,"bandeira,preco_medio_gasolina"
+15,dificil,"Pela regra dos 70%, liste até 10 postos do município de São Paulo onde o etanol compensa na coleta mais recente.","WITH janela AS (                -- R06: últimos 3 meses até o último mês com dados
+    SELECT CAST(date_trunc('month', MAX(data)) - INTERVAL 2 MONTH AS DATE) AS inicio,
+           MAX(data)                                                      AS fim
+    FROM fato_precos
+),
+precos_dia AS (                 -- R08: etanol e gasolina do MESMO posto na MESMA data
+    SELECT f.cnpj, f.data,
+           MAX(f.valor_venda) FILTER (WHERE pr.produto = 'ETANOL')   AS etanol,
+           MAX(f.valor_venda) FILTER (WHERE pr.produto = 'GASOLINA') AS gasolina
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN janela j       ON f.data BETWEEN j.inicio AND j.fim
+    WHERE l.uf = 'SP' AND l.municipio = 'SAO PAULO'
+      AND pr.produto IN ('ETANOL', 'GASOLINA')
+    GROUP BY f.cnpj, f.data
+    HAVING etanol IS NOT NULL AND gasolina IS NOT NULL
+),
+mais_recente AS (               -- data mais recente de cada posto com os dois produtos
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY cnpj ORDER BY data DESC) AS ordem
+    FROM precos_dia
+)
+SELECT p.razao_social, p.bairro,
+       m.etanol, m.gasolina,
+       ROUND(m.etanol / m.gasolina, 3) AS razao_etanol_gasolina,
+       m.data AS data_pesquisa
+FROM mais_recente m
+JOIN dim_posto p ON p.cnpj = m.cnpj
+WHERE m.ordem = 1
+  AND m.etanol / m.gasolina <= 0.70
+ORDER BY razao_etanol_gasolina, m.data DESC, p.razao_social
+LIMIT 10","10 postos, razão etanol/gasolina de 0,516 (Centro Automotivo Lyon Ltda, 29/06/2026) a 0,558 (Auto Posto City Tatuapé Ltda); janela de coleta recente abr-jun/2026.",R06 R08 R12 R14,"razao_social,razao_etanol_gasolina"
+16,dificil,"Qual foi a variação % do preço médio da gasolina entre o 1º semestre de 2025 e o 1º semestre de 2026, por estado?","WITH por_posto AS (             -- R13, 1º passo: média de cada posto em cada semestre
+    SELECT l.uf, t.ano, f.cnpj, AVG(f.valor_venda) AS preco_posto
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto = 'GASOLINA' AND t.semestre = 1 AND t.ano IN (2025, 2026)
+    GROUP BY l.uf, t.ano, f.cnpj
+)
+SELECT uf,                      -- R13, 2º passo: média dos postos em cada semestre
+       ROUND(AVG(preco_posto) FILTER (WHERE ano = 2025), 3) AS media_1s_2025,
+       ROUND(AVG(preco_posto) FILTER (WHERE ano = 2026), 3) AS media_1s_2026,
+       ROUND((AVG(preco_posto) FILTER (WHERE ano = 2026)
+            / AVG(preco_posto) FILTER (WHERE ano = 2025) - 1) * 100, 2) AS variacao_pct
+FROM por_posto
+GROUP BY uf
+ORDER BY variacao_pct DESC","27 UFs. Maiores altas: BA +9,00%, PE +8,17%, AP +7,59%. Quedas: DF -0,75%, AM -2,24%, AC -3,69%.",R13 variacao_percentual,"uf,variacao_pct"
+17,dificil,Quais 5 municípios tiveram a maior alta percentual no preço médio do etanol entre o 1º semestre de 2025 e o 1º semestre de 2026? Considere só municípios com pelo menos 5 postos pesquisados em cada semestre.,"WITH por_posto AS (             -- R13: média de cada posto em cada semestre
+    SELECT l.uf, l.municipio, t.ano, f.cnpj, AVG(f.valor_venda) AS preco_posto
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto = 'ETANOL' AND t.semestre = 1 AND t.ano IN (2025, 2026)
+    GROUP BY l.uf, l.municipio, t.ano, f.cnpj
+),
+por_municipio AS (
+    SELECT uf, municipio,
+           AVG(preco_posto) FILTER (WHERE ano = 2025) AS media_1s_2025,
+           AVG(preco_posto) FILTER (WHERE ano = 2026) AS media_1s_2026,
+           COUNT(*) FILTER (WHERE ano = 2025)         AS postos_2025,
+           COUNT(*) FILTER (WHERE ano = 2026)         AS postos_2026
+    FROM por_posto
+    GROUP BY uf, municipio
+)
+SELECT uf, municipio,
+       ROUND(media_1s_2025, 3) AS media_1s_2025,
+       ROUND(media_1s_2026, 3) AS media_1s_2026,
+       ROUND((media_1s_2026 / media_1s_2025 - 1) * 100, 2) AS variacao_pct,
+       postos_2025, postos_2026
+FROM por_municipio
+WHERE postos_2025 >= 5 AND postos_2026 >= 5                -- R05: mínimo de 5 postos em CADA período
+ORDER BY variacao_pct DESC, uf, municipio
+LIMIT 5","UBERLANDIA/MG +18,17%; CAICO/RN +17,00%; ANAPOLIS/GO +16,69%; VITORIA DA CONQUISTA/BA +15,56%; PIMENTA BUENO/RO +14,56%.",R05 R13 variacao_percentual,"uf,municipio,variacao_pct"
+18,dificil,"Em Curitiba, em quantos postos o etanol compensava (regra dos 70%), mês a mês, no 1º semestre de 2026, e que percentual isso representa dos postos com os dois preços? Considere a última coleta de cada posto no mês.","WITH pares AS (                 -- R08: etanol e gasolina do MESMO posto na MESMA data
+    SELECT t.ano_mes, f.cnpj, f.data,
+           MAX(f.valor_venda) FILTER (WHERE pr.produto = 'ETANOL')   AS etanol,
+           MAX(f.valor_venda) FILTER (WHERE pr.produto = 'GASOLINA') AS gasolina
+    FROM fato_precos f
+    JOIN dim_produto pr ON pr.id_produto = f.id_produto
+    JOIN dim_local l    ON l.id_local    = f.id_local
+    JOIN dim_tempo t    ON t.data        = f.data
+    WHERE pr.produto IN ('ETANOL', 'GASOLINA')
+      AND l.municipio = 'CURITIBA' AND l.uf = 'PR'
+      AND t.ano = 2026 AND t.semestre = 1
+    GROUP BY t.ano_mes, f.cnpj, f.data
+    HAVING etanol IS NOT NULL AND gasolina IS NOT NULL
+),
+ultimo_do_mes AS (              -- última coleta (com os dois preços) de cada posto no mês
+    SELECT * FROM pares
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY ano_mes, cnpj ORDER BY data DESC) = 1
+)
+SELECT ano_mes,
+       COUNT(*)                                        AS postos_com_os_dois_precos,
+       COUNT(*) FILTER (WHERE etanol / gasolina <= 0.70) AS postos_etanol_compensa,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE etanol / gasolina <= 0.70) / COUNT(*), 1) AS pct_postos
+FROM ultimo_do_mes
+GROUP BY ano_mes
+ORDER BY ano_mes","Postos onde o etanol compensava / postos com os dois preços: jan 0/53 (0%); fev 0/66 (0%); mar 4/75 (5,3%); abr 10/72 (13,9%); mai 7/70 (10,0%); jun 38/54 (70,4%).",R08 R12 razao_etanol_gasolina,"ano_mes,postos_etanol_compensa,pct_postos"
+19,armadilha,Qual é o preço médio da gasolina em São Paulo no último mês?,,PEDIR ESCLARECIMENTO: 'São Paulo' é ambíguo — município (SAO PAULO/SP) ou estado (SP)? Não gerar nem executar SQL antes da resposta do usuário.,termos_ambiguos,
+20,armadilha,Qual é a margem de lucro dos postos Ipiranga na gasolina em 2025?,,"RECUSAR COM EDUCAÇÃO: a base não tem preço de compra (coluna descartada; só existia até ago/2020), então não é possível calcular margem de lucro. Oferecer, por exemplo, o preço médio de venda da gasolina nos postos Ipiranga em 2025.",termos_fora_da_base,

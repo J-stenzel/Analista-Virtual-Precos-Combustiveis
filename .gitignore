@@ -1,0 +1,22 @@
+# Segredos
+.env
+
+# Dados grandes (gerados/baixados localmente — ver README)
+data/raw/*.csv
+data/raw/*.zip
+data/processed/*.duckdb.wal
+# (o combustiveis.duckdb tem ~40 MB e PODE ir para o GitHub — limite é 100 MB)
+
+# Registros e cache locais da LLM (gerados ao rodar; podem conter perguntas/respostas)
+logs/
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Temporários
+.tmp/
+*.log

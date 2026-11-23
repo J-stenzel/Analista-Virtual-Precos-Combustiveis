@@ -1,0 +1,192 @@
+Preços semestrais - AUTOMOTIVOS_2020.01.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2020.02.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2021.01.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2021.02.csv: encoding=latin-1
+Preços semestrais - AUTOMOTIVOS_2022.02.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2023.01.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2023.02.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2024.01.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2024.02.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2025.01.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2025.02.csv: encoding=utf-8
+Preços semestrais - AUTOMOTIVOS_2026.01.csv: encoding=utf-8
+
+### Linhas por arquivo
+┌─────────┬────────┐
+│ arquivo │ linhas │
+│ varchar │ int64  │
+├─────────┼────────┤
+│ 2020.01 │ 496663 │
+│ 2020.02 │ 222637 │
+│ 2021.01 │ 334681 │
+│ 2021.02 │ 472856 │
+│ 2022.02 │ 378078 │
+│ 2023.01 │ 431576 │
+│ 2023.02 │ 472424 │
+│ 2024.01 │ 477154 │
+│ 2024.02 │ 421382 │
+│ 2025.01 │ 429523 │
+│ 2025.02 │ 384208 │
+│ 2026.01 │ 422418 │
+└─────────┴────────┘
+      12 rows     
+
+
+### Total de linhas
+┌──────────────┐
+│ count_star() │
+│    int64     │
+├──────────────┤
+│      4943600 │
+└──────────────┘
+
+
+### Colunas
+┌───────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name    │ column_type │  null   │   key   │ default │  extra  │
+│      varchar      │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├───────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ arquivo           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Regiao - Sigla    │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Estado - Sigla    │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Municipio         │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Revenda           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ CNPJ da Revenda   │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Nome da Rua       │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Numero Rua        │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Complemento       │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Bairro            │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Cep               │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Produto           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Data da Coleta    │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Valor de Venda    │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Unidade de Medida │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ Bandeira          │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+└───────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+  16 rows                                                       6 columns
+
+
+### Nulos por coluna
+┌─────────┬────────────────┬────────────────┬───────────┬───┬────────────────┬───────────────────┬──────────┐
+│ arquivo │ Regiao - Sigla │ Estado - Sigla │ Municipio │ … │ Valor de Venda │ Unidade de Medida │ Bandeira │
+│ int128  │     int128     │     int128     │  int128   │ … │     int128     │      int128       │  int128  │
+├─────────┼────────────────┼────────────────┼───────────┼───┼────────────────┼───────────────────┼──────────┤
+│       0 │           9114 │           9114 │      9114 │ … │           9114 │              9114 │     9114 │
+└─────────┴────────────────┴────────────────┴───────────┴───┴────────────────┴───────────────────┴──────────┘
+  1 rows                                                                               16 columns (7 shown)
+
+
+### Regiões
+┌────────────────┬─────────┐
+│ Regiao - Sigla │    n    │
+│    varchar     │  int64  │
+├────────────────┼─────────┤
+│ SE             │ 2395919 │
+│ NE             │  967628 │
+│ S              │  849366 │
+│ CO             │  405104 │
+│ N              │  316469 │
+│ NULL           │    9114 │
+└────────────────┴─────────┘
+
+
+### Qtd de estados, municípios e postos
+┌─────────┬────────────┬────────┐
+│ estados │ municipios │ postos │
+│  int64  │   int64    │ int64  │
+├─────────┼────────────┼────────┤
+│      27 │        470 │  21013 │
+└─────────┴────────────┴────────┘
+
+
+### Produtos e unidades
+┌────────────────────┬───────────────────┬─────────┐
+│      Produto       │ Unidade de Medida │    n    │
+│      varchar       │      varchar      │  int64  │
+├────────────────────┼───────────────────┼─────────┤
+│ GASOLINA           │ R$ / litro        │ 1303245 │
+│ ETANOL             │ R$ / litro        │ 1124705 │
+│ DIESEL S10         │ R$ / litro        │  973491 │
+│ GASOLINA ADITIVADA │ R$ / litro        │  854020 │
+│ DIESEL             │ R$ / litro        │  578917 │
+│ GNV                │ R$ / m³           │   91376 │
+│ NULL               │ NULL              │    9114 │
+│ GNV                │ R$ / m3           │    8732 │
+└────────────────────┴───────────────────┴─────────┘
+
+
+### Bandeiras (top 25)
+┌──────────────────────────────┬─────────┐
+│           Bandeira           │    n    │
+│           varchar            │  int64  │
+├──────────────────────────────┼─────────┤
+│ BRANCA                       │ 1705575 │
+│ IPIRANGA                     │  972360 │
+│ RAIZEN                       │  755516 │
+│ VIBRA                        │  541156 │
+│ VIBRA ENERGIA                │  338009 │
+│ PETROBRAS DISTRIBUIDORA S.A. │  188339 │
+│ ALESAT                       │   92999 │
+│ SABBÁ                        │   54361 │
+│ ALE                          │   50257 │
+│ ATEM' S                      │   24240 │
+│   ·                          │     ·   │
+│   ·                          │     ·   │
+│   ·                          │     ·   │
+│ TAURUS                       │   11659 │
+│ STANG                        │   10052 │
+│ NULL                         │    9114 │
+│ DISLUB                       │    8663 │
+│ CIAPETRO                     │    8163 │
+│ MAXSUL                       │    6066 │
+│ ATLÂNTICA                    │    6056 │
+│ IDAZA                        │    5774 │
+│ TOTALENERGIES                │    5642 │
+│ PETROX DISTRIBUIDORA         │    5556 │
+└──────────────────────────────┴─────────┘
+  25 rows (20 shown)           2 columns
+
+
+### Período coberto
+┌─────────────────────┬─────────────────────┐
+│       inicio        │         fim         │
+│      timestamp      │      timestamp      │
+├─────────────────────┼─────────────────────┤
+│ 2020-01-01 00:00:00 │ 2026-06-30 00:00:00 │
+└─────────────────────┴─────────────────────┘
+
+
+### Formatos de CNPJ (amostra)
+┌─────────┬─────────┬─────────────────────┐
+│ tamanho │    n    │       exemplo       │
+│  int64  │  int64  │       varchar       │
+├─────────┼─────────┼─────────────────────┤
+│      18 │ 4550278 │  49.051.667/0001-02 │
+│      14 │  384208 │ 03698504000115      │
+│    NULL │    9114 │ NULL                │
+└─────────┴─────────┴─────────────────────┘
+
+
+### Preço por produto (mín / médio / máx)
+┌────────────────────┬────────┬────────┬────────┐
+│      Produto       │ minimo │ medio  │ maximo │
+│      varchar       │ double │ double │ double │
+├────────────────────┼────────┼────────┼────────┤
+│ DIESEL             │  2.453 │   5.42 │   9.45 │
+│ DIESEL S10         │  2.465 │  5.497 │   9.99 │
+│ ETANOL             │  1.799 │   4.13 │  7.899 │
+│ GASOLINA           │   2.87 │  5.643 │   9.79 │
+│ GASOLINA ADITIVADA │  3.457 │  6.067 │   9.89 │
+│ GNV                │    2.0 │  4.409 │   7.99 │
+│ NULL               │   NULL │   NULL │   NULL │
+└────────────────────┴────────┴────────┴────────┘
+
+
+### Linhas duplicadas exatas
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│ (count_star() - (SELECT count_star() FROM (SELECT DISTINCT * EXCLUDE (arquivo) FROM bruto))) │
+│                                            int64                                             │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                         9129 │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
+

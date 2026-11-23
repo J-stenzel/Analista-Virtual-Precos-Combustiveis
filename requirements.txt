@@ -1,0 +1,8 @@
+duckdb>=1.1
+pandas>=2.0
+pyyaml>=6.0
+python-dotenv>=1.0
+openai>=3.57        # LLM dos agentes (Etapa 3); chave em OPENAI_API_KEY no .env
+streamlit>=1.35
+ipykernel>=6.0      # para rodar os notebooks no VS Code
+matplotlib>=3.8     # gráficos (make_chart, Etapa 3) e fonte DejaVu para gerar os PDFs de entrega

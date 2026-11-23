@@ -1,0 +1,704 @@
+# =============================================================================
+# CAMADA SEMÂNTICA — Analista Virtual de Preços de Combustíveis (base ANP)
+# =============================================================================
+# Este arquivo é o "conhecimento do analista de BI" escrito para a LLM.
+# Os agentes consultam este arquivo (via get_schema / get_metric) ANTES de gerar SQL.
+#
+# Seções:
+#   1. projeto            -> contexto geral (o que a base é e o que NÃO é)
+#   2. tabelas            -> o que cada tabela/coluna significa em linguagem de negócio   [2.5.1 ✅]
+#   3. relacionamentos    -> como fazer os JOINs                                          [2.5.2 ✅]
+#   4. metricas           -> cálculos definidos UMA vez                                   [2.5.3 ✅]
+#   5. sinonimos          -> palavras do usuário -> termos da base                        [2.5.4 ✅]
+#   6. regras_de_negocio  -> regras que TODA consulta deve respeitar                      [2.5.5 ✅]
+# =============================================================================
+
+projeto:
+  nome: "Analista Virtual de Preços de Combustíveis"
+  fonte: "ANP — Série Histórica de Preços de Combustíveis (Levantamento de Preços de Combustíveis - LPC)"
+  periodo_coberto: "jan/2020 a jun/2026 (set/2020 sem coleta; hipótese: pandemia)"
+  banco: "DuckDB (SQL dialeto DuckDB)"
+  descricao: >
+    Preços de venda ao consumidor de combustíveis automotivos, coletados semanalmente
+    pela ANP em uma AMOSTRA de postos de ~470 municípios brasileiros.
+    Cada linha da fato é o preço de um produto, em um posto, numa data de coleta.
+  o_que_a_base_NAO_tem:
+    - "Preço de compra do posto / margem (descartado: só existia até ago/2020)"
+    - "Volume vendido ou demanda"
+    - "Todos os postos do Brasil (é uma amostra) nem todos os dias (coleta semanal)"
+    - "GLP (gás de cozinha) — só combustíveis automotivos"
+
+# -----------------------------------------------------------------------------
+# 2. TABELAS  (passo 2.5.1)
+# -----------------------------------------------------------------------------
+tabelas:
+
+  fato_precos:
+    descricao: "Um registro por preço coletado: 1 produto, em 1 posto, em 1 data de coleta."
+    grao: "data + cnpj + id_produto"
+    chave: [data, cnpj, id_produto]
+    linhas_aprox: 5463890
+    colunas:
+      data: "Data da coleta do preço pela ANP (DATE). Liga com dim_tempo.data."
+      cnpj: "CNPJ do posto, só dígitos (14 caracteres). Liga com dim_posto.cnpj."
+      id_local: "Município do posto NA DATA da coleta. Liga com dim_local.id_local."
+      id_produto: "Combustível coletado. Liga com dim_produto.id_produto."
+      id_bandeira: "Bandeira do posto NA DATA da coleta (o posto pode trocar de bandeira). Liga com dim_bandeira.id_bandeira."
+      valor_venda: "Preço de venda ao consumidor em R$. Por litro, exceto GNV, que é por m³."
+      qtd_registros_origem: "Uso técnico: quantas linhas do CSV original viraram este registro (>1 = duplicata tratada pela média)."
+      arquivo_origem: "Uso técnico: semestre do arquivo da ANP de onde veio o dado (ex.: '2025.01')."
+
+  dim_tempo:
+    descricao: "Calendário: um registro por dia, de 01/01/2020 a 30/06/2026 (inclui dias sem coleta)."
+    chave: [data]
+    colunas:
+      data: "Dia (DATE)."
+      ano: "Ano (ex.: 2025)."
+      semestre: "1 = jan–jun, 2 = jul–dez."
+      trimestre: "1 a 4."
+      mes: "Mês numérico, 1 a 12."
+      ano_mes: "Ano e mês no formato 'AAAA-MM' (ex.: '2026-06'). Use para agrupar por mês."
+      semana_iso: "Semana do ano (padrão ISO)."
+      dia_semana_num: "1 = segunda ... 7 = domingo."
+      dia_semana: "Nome do dia em português (segunda, terça, ..., domingo)."
+
+  dim_local:
+    descricao: "Localização do posto em hierarquia: Região > UF > Município."
+    chave: [id_local]
+    colunas:
+      id_local: "Identificador do município (chave técnica)."
+      regiao_sigla: "Sigla da região: N, NE, CO, SE, S."
+      regiao_nome: "Nome da região: Norte, Nordeste, Centro-Oeste, Sudeste, Sul."
+      uf: "Sigla do estado com 2 letras (ex.: SP, PR, MG)."
+      municipio: "Nome do município em MAIÚSCULAS e SEM ACENTO (ex.: 'SAO PAULO', 'BELO HORIZONTE')."
+    observacoes:
+      - "Nomes de município se repetem entre estados: sempre filtrar municipio E uf."
+
+  dim_produto:
+    descricao: "Combustíveis pesquisados (6 produtos)."
+    chave: [id_produto]
+    colunas:
+      id_produto: "Identificador do produto (chave técnica)."
+      produto: "GASOLINA | GASOLINA ADITIVADA | ETANOL | DIESEL | DIESEL S10 | GNV"
+      tipo_combustivel: "Agrupamento: GASOLINA (comum + aditivada) | ETANOL | DIESEL (comum + S10) | GNV"
+      unidade: "'R$ / litro' para todos, exceto GNV = 'R$ / m³'."
+
+  dim_bandeira:
+    descricao: "Bandeira (distribuidora) exibida pelo posto, com nomes já padronizados."
+    chave: [id_bandeira]
+    colunas:
+      id_bandeira: "Identificador da bandeira (chave técnica)."
+      bandeira: "Nome padronizado em MAIÚSCULAS (ex.: VIBRA, IPIRANGA, RAIZEN, ALE, BRANCA)."
+      eh_bandeira_branca: "true = posto sem bandeira (bandeira BRANCA, compra de qualquer distribuidora)."
+      nomes_originais: "Nomes que a ANP usou ao longo do tempo (ex.: VIBRA = 'PETROBRAS DISTRIBUIDORA S.A. | VIBRA ENERGIA | VIBRA')."
+
+  dim_posto:
+    descricao: "Cadastro do posto (revenda). Dados MAIS RECENTES de cada CNPJ."
+    chave: [cnpj]
+    colunas:
+      cnpj: "CNPJ do posto, só dígitos (14 caracteres)."
+      razao_social: "Nome (razão social) do posto, em maiúsculas."
+      bairro: "Bairro do posto (pode ter acento)."
+      cep: "CEP no formato '00000-000'."
+      primeira_coleta: "Primeira data em que o posto aparece na pesquisa."
+      ultima_coleta: "Última data em que o posto aparece na pesquisa (indica quão recente é o dado do posto)."
+
+# -----------------------------------------------------------------------------
+# 3. RELACIONAMENTOS  (passo 2.5.2)
+# -----------------------------------------------------------------------------
+# Modelo ESTRELA: fato_precos no centro; cada dimensão liga SÓ com a fato.
+# Verificado no banco (22/11/2026): 0 chaves órfãs e 0 nulos em todas as FKs
+# -> INNER JOIN e LEFT JOIN dão o mesmo resultado; use JOIN (INNER).
+relacionamentos:
+
+  - nome: fato_tempo
+    de: fato_precos.data
+    para: dim_tempo.data
+    tipo: INNER JOIN
+    cardinalidade: "N:1 (muitas coletas para um dia)"
+    sql: "JOIN dim_tempo t ON t.data = f.data"
+    observacao: >
+      dim_tempo tem TODOS os dias (2.373), mas 709 não têm coleta (ex.: set/2020).
+      Nunca conte dias/meses a partir da dim_tempo para saber "quando houve pesquisa":
+      use a fato. Para filtro simples de data, nem precisa do JOIN (use f.data direto).
+
+  - nome: fato_posto
+    de: fato_precos.cnpj
+    para: dim_posto.cnpj
+    tipo: INNER JOIN
+    cardinalidade: "N:1 (muitas coletas para um posto)"
+    sql: "JOIN dim_posto p ON p.cnpj = f.cnpj"
+    observacao: >
+      dim_posto guarda os dados MAIS RECENTES do posto (razão social, bairro, CEP).
+      Ela NÃO tem município nem bandeira: estes vêm sempre da fato.
+
+  - nome: fato_local
+    de: fato_precos.id_local
+    para: dim_local.id_local
+    tipo: INNER JOIN
+    cardinalidade: "N:1 (muitas coletas para um município)"
+    sql: "JOIN dim_local l ON l.id_local = f.id_local"
+    observacao: "É o município NA DATA da coleta (16 postos mudaram de município no período)."
+
+  - nome: fato_produto
+    de: fato_precos.id_produto
+    para: dim_produto.id_produto
+    tipo: INNER JOIN
+    cardinalidade: "N:1 (muitas coletas para um produto)"
+    sql: "JOIN dim_produto pr ON pr.id_produto = f.id_produto"
+
+  - nome: fato_bandeira
+    de: fato_precos.id_bandeira
+    para: dim_bandeira.id_bandeira
+    tipo: INNER JOIN
+    cardinalidade: "N:1 (muitas coletas para uma bandeira)"
+    sql: "JOIN dim_bandeira b ON b.id_bandeira = f.id_bandeira"
+    observacao: "É a bandeira NA DATA da coleta (3.322 postos trocaram de bandeira no período)."
+
+# Apelidos fixos: deixam o SQL gerado padronizado e fácil de comparar com o golden set.
+aliases_padrao: {fato_precos: f, dim_tempo: t, dim_posto: p, dim_local: l, dim_produto: pr, dim_bandeira: b}
+
+joins_proibidos:
+  - "Dimensão com dimensão (ex.: dim_posto com dim_local): não existe chave entre elas; sempre passe pela fato."
+  - "Descobrir bandeira ou município de um posto sem passar pela fato (eles mudam com o tempo)."
+  - "Self-join da fato para comparar produtos (ex.: etanol × gasolina) sem casar cnpj E data."
+
+# -----------------------------------------------------------------------------
+# 4. METRICAS  (passo 2.5.3)
+# -----------------------------------------------------------------------------
+# Cada métrica é definida UMA vez. O Agente SQL deve usar a definição daqui.
+# Exemplos usam perguntas DIFERENTES do golden set (para não "vazar" a prova).
+# Toda métrica de preço EXIGE filtrar UM produto (ou agrupar por produto):
+# nunca misturar produtos, e nunca R$/litro com GNV (R$/m³).
+#
+# DECISÃO DO ALUNO (22/11/2026): preço médio = MÉDIA POR POSTO.
+#   1º) média de cada posto no recorte (CTE por_posto)
+#   2º) média dessas médias -> cada posto pesa IGUAL, não importa quantas vezes foi visitado.
+
+# Modelo de CTE usado por todas as métricas de média.
+# <dimensoes> = as mesmas colunas do GROUP BY final (ex.: l.uf, t.ano). Pode ser vazio.
+padrao_media_por_posto: |
+  WITH por_posto AS (
+    SELECT <dimensoes>, f.cnpj, AVG(f.valor_venda) AS preco_posto
+    FROM fato_precos f
+    JOIN ...                      -- só as dimensões necessárias
+    WHERE <filtros>               -- produto obrigatório
+    GROUP BY <dimensoes>, f.cnpj
+  )
+  SELECT <dimensoes>, ROUND(AVG(preco_posto), 3) AS preco_medio, COUNT(*) AS num_postos
+  FROM por_posto
+  GROUP BY <dimensoes>
+
+metricas:
+
+  preco_medio:
+    descricao: "Preço médio de venda = média das médias de cada posto no recorte (cada posto pesa igual)."
+    expressao_sql: "ROUND(AVG(preco_posto), 3)  -- sobre a CTE por_posto (ver padrao_media_por_posto)"
+    unidade: "R$/litro (GNV: R$/m³)"
+    exige: ["filtro ou GROUP BY de produto", "CTE por_posto agrupada por cnpj + as mesmas dimensões do resultado"]
+    observacao: >
+      NÃO usar AVG(f.valor_venda) direto: isso é média das coletas e faz o posto
+      visitado mais vezes pesar mais. Se o resultado é agrupado (por UF, mês...),
+      a CTE também precisa agrupar por essas colunas.
+
+  preco_minimo:
+    descricao: "Menor preço efetivamente coletado no recorte (um preço real visto na bomba)."
+    expressao_sql: "MIN(f.valor_venda)"
+    exige: ["filtro ou GROUP BY de produto"]
+
+  preco_maximo:
+    descricao: "Maior preço efetivamente coletado no recorte."
+    expressao_sql: "MAX(f.valor_venda)"
+    exige: ["filtro ou GROUP BY de produto"]
+
+  amplitude:
+    descricao: "Diferença entre o preço mais caro e o mais barato coletados (máximo − mínimo)."
+    expressao_sql: "MAX(f.valor_venda) - MIN(f.valor_venda)"
+    unidade: "R$"
+    exige: ["filtro ou GROUP BY de produto"]
+    sinonimos_da_metrica: ["diferença entre o posto mais caro e o mais barato", "dispersão", "spread"]
+    observacao: "Mínimo, máximo e amplitude usam as COLETAS (preços reais), não as médias por posto."
+
+  num_postos:
+    descricao: "Quantidade de postos pesquisados no recorte."
+    expressao_sql: "COUNT(DISTINCT f.cnpj)  -- ou COUNT(*) sobre a CTE por_posto"
+    observacao: "Nunca COUNT(*) na fato: um posto tem várias coletas e vários produtos."
+
+  num_coletas:
+    descricao: "Quantidade de preços coletados (tamanho da amostra). Útil para ressalvas."
+    expressao_sql: "COUNT(*)  -- direto na fato"
+
+  periodo_da_amostra:
+    descricao: "Datas da 1ª e da última coleta usadas no cálculo. Obrigatório em respostas sobre 'atual'/'último mês'/'recente'."
+    expressao_sql: "MIN(f.data) AS primeira_coleta, MAX(f.data) AS ultima_coleta"
+
+  variacao_percentual:
+    descricao: "Variação % do preço médio (por posto) entre um período base (A) e um final (B): (média B ÷ média A − 1) × 100."
+    expressao_sql: >
+      ROUND((AVG(preco_posto) FILTER (WHERE <periodo = B>)
+           / AVG(preco_posto) FILTER (WHERE <periodo = A>) - 1) * 100, 2)
+    unidade: "%"
+    exige: ["filtro de produto", "WHERE limitando aos dois períodos", "CTE por_posto agrupada também pelo período"]
+    observacao: "Positivo = ficou mais caro. A amostra de postos pode mudar entre os períodos (citar como ressalva)."
+    exemplo:
+      pergunta: "Quanto o etanol subiu de 2024 para 2025 em cada região?"
+      resultado_teste: "Centro-Oeste +14,91% · Sudeste +10,23% · Sul +10,00% · Norte +9,20% · Nordeste +8,32%"
+      sql: |
+        WITH por_posto AS (
+          SELECT l.regiao_nome, t.ano, f.cnpj, AVG(f.valor_venda) AS preco_posto
+          FROM fato_precos f
+          JOIN dim_produto pr ON pr.id_produto = f.id_produto
+          JOIN dim_local l    ON l.id_local    = f.id_local
+          JOIN dim_tempo t    ON t.data        = f.data
+          WHERE pr.produto = 'ETANOL' AND t.ano IN (2024, 2025)
+          GROUP BY l.regiao_nome, t.ano, f.cnpj
+        )
+        SELECT regiao_nome,
+               ROUND(AVG(preco_posto) FILTER (WHERE ano = 2024), 3) AS media_2024,
+               ROUND(AVG(preco_posto) FILTER (WHERE ano = 2025), 3) AS media_2025,
+               ROUND((AVG(preco_posto) FILTER (WHERE ano = 2025)
+                    / AVG(preco_posto) FILTER (WHERE ano = 2024) - 1) * 100, 2) AS variacao_pct
+        FROM por_posto
+        GROUP BY regiao_nome
+        ORDER BY variacao_pct DESC
+
+  razao_etanol_gasolina:
+    descricao: "Preço do etanol ÷ preço da gasolina comum NO MESMO POSTO E NA MESMA DATA. Etanol compensa se ≤ 0,70."
+    expressao_sql: "ROUND(preco_etanol / preco_gasolina, 3)  -- sobre os pares (cnpj, data) do exemplo"
+    exige: ["parear etanol e gasolina por cnpj + data", "descartar pares em que falte um dos dois"]
+    observacao: >
+      NUNCA dividir a média do etanol da cidade pela média da gasolina da cidade:
+      a regra é por posto. Para "coleta mais recente": PRIMEIRO montar os pares (cnpj, data) que têm OS DOIS
+      preços, DEPOIS pegar o par mais recente de cada posto. NÃO pegar a última data do posto antes de montar
+      os pares (a última visita pode ter só um dos produtos e o posto sumiria da conta).
+    exemplo:
+      pergunta: "Em quais postos de Campinas o etanol compensou no 2º trimestre de 2026?"
+      sql: |
+        WITH pares AS (
+          SELECT f.cnpj, f.data,
+                 MAX(f.valor_venda) FILTER (WHERE pr.produto = 'ETANOL')   AS preco_etanol,
+                 MAX(f.valor_venda) FILTER (WHERE pr.produto = 'GASOLINA') AS preco_gasolina
+          FROM fato_precos f
+          JOIN dim_produto pr ON pr.id_produto = f.id_produto
+          JOIN dim_local l    ON l.id_local    = f.id_local
+          WHERE pr.produto IN ('ETANOL', 'GASOLINA')
+            AND l.municipio = 'CAMPINAS' AND l.uf = 'SP'
+            AND f.data BETWEEN DATE '2026-04-01' AND DATE '2026-06-30'
+          GROUP BY f.cnpj, f.data
+        )
+        SELECT cnpj, data, preco_etanol, preco_gasolina,
+               ROUND(preco_etanol / preco_gasolina, 3) AS razao,
+               preco_etanol / preco_gasolina <= 0.70  AS etanol_compensa
+        FROM pares
+        WHERE preco_etanol IS NOT NULL AND preco_gasolina IS NOT NULL
+        ORDER BY razao
+
+  diferenca_bandeira_vs_branca:
+    descricao: "Preço médio (por posto) dos postos COM bandeira − preço médio (por posto) dos de bandeira BRANCA."
+    expressao_sql: >
+      ROUND(AVG(preco_posto) FILTER (WHERE NOT eh_bandeira_branca)
+          - AVG(preco_posto) FILTER (WHERE eh_bandeira_branca), 3)
+    unidade: "R$"
+    exige: ["filtro de produto", "JOIN dim_bandeira", "CTE por_posto agrupada também por b.eh_bandeira_branca"]
+    observacao: >
+      Positivo = bandeira branca é MAIS BARATA. Mostrar também as duas médias e quantos postos há em cada grupo.
+      A CTE agrupa por eh_bandeira_branca porque um posto que trocou de bandeira no período entra nos dois grupos,
+      cada um com os preços da sua época.
+    exemplo:
+      pergunta: "No Sul, o diesel S10 do posto sem bandeira saiu mais barato em 2025? Por estado."
+      resultado_teste: "PR 0,145 · RS 0,187 · SC 0,097 (R$ a menos na bandeira branca)"
+      sql: |
+        WITH por_posto AS (
+          SELECT l.uf, f.cnpj, b.eh_bandeira_branca, AVG(f.valor_venda) AS preco_posto
+          FROM fato_precos f
+          JOIN dim_produto pr  ON pr.id_produto = f.id_produto
+          JOIN dim_local l     ON l.id_local    = f.id_local
+          JOIN dim_bandeira b  ON b.id_bandeira = f.id_bandeira
+          JOIN dim_tempo t     ON t.data        = f.data
+          WHERE pr.produto = 'DIESEL S10' AND t.ano = 2025 AND l.regiao_sigla = 'S'
+          GROUP BY l.uf, f.cnpj, b.eh_bandeira_branca
+        )
+        SELECT uf,
+               ROUND(AVG(preco_posto) FILTER (WHERE NOT eh_bandeira_branca), 3) AS media_com_bandeira,
+               ROUND(AVG(preco_posto) FILTER (WHERE eh_bandeira_branca), 3)     AS media_branca,
+               ROUND(AVG(preco_posto) FILTER (WHERE NOT eh_bandeira_branca)
+                   - AVG(preco_posto) FILTER (WHERE eh_bandeira_branca), 3)     AS diferenca,
+               COUNT(*) FILTER (WHERE NOT eh_bandeira_branca) AS postos_com_bandeira,
+               COUNT(*) FILTER (WHERE eh_bandeira_branca)     AS postos_branca
+        FROM por_posto
+        GROUP BY uf
+        ORDER BY uf
+
+# Exemplo combinado: média (por posto) + métricas sobre as coletas.
+# Testado: média R$ 6,256 · mín 5,89 · máx 6,69 · 50 postos · 144 coletas · 06 a 27/05/2026
+exemplo_metricas_simples:
+  pergunta: "Resumo do preço da gasolina em Porto Alegre em maio de 2026."
+  sql: |
+    WITH recorte AS (
+      SELECT f.cnpj, f.data, f.valor_venda
+      FROM fato_precos f
+      JOIN dim_produto pr ON pr.id_produto = f.id_produto
+      JOIN dim_local l    ON l.id_local    = f.id_local
+      JOIN dim_tempo t    ON t.data        = f.data
+      WHERE pr.produto = 'GASOLINA' AND l.municipio = 'PORTO ALEGRE' AND l.uf = 'RS'
+        AND t.ano_mes = '2026-05'
+    ),
+    por_posto AS (
+      SELECT cnpj, AVG(valor_venda) AS preco_posto FROM recorte GROUP BY cnpj
+    )
+    SELECT (SELECT ROUND(AVG(preco_posto), 3) FROM por_posto) AS preco_medio,
+           MIN(valor_venda)                      AS preco_minimo,
+           MAX(valor_venda)                      AS preco_maximo,
+           MAX(valor_venda) - MIN(valor_venda)   AS amplitude,
+           COUNT(DISTINCT cnpj)                  AS num_postos,
+           COUNT(*)                              AS num_coletas,
+           MIN(data) AS primeira_coleta, MAX(data) AS ultima_coleta
+    FROM recorte
+
+# -----------------------------------------------------------------------------
+# 5. SINONIMOS  (passo 2.5.4)
+# -----------------------------------------------------------------------------
+# Traduz palavras do usuário -> valores EXATOS da base.
+# Formato: VALOR_NA_BASE: [variações que o usuário pode usar]
+# Regra de ouro: depois de traduzir, filtrar com "=" no valor exato (nunca ILIKE '%...%').
+sinonimos:
+
+  produtos:          # coluna dim_produto.produto
+    GASOLINA: ["gasolina", "gasolina comum", "gasolina C", "gasolina normal"]
+    GASOLINA ADITIVADA: ["gasolina aditivada", "aditivada"]
+    ETANOL: ["etanol", "álcool", "alcool", "etanol hidratado", "álcool combustível"]
+    DIESEL: ["diesel", "diesel comum", "óleo diesel", "diesel S500", "S500"]
+    DIESEL S10: ["diesel S10", "diesel S-10", "S10", "S-10", "diesel aditivado S10"]
+    GNV: ["GNV", "gás natural", "gás natural veicular", "gás veicular"]
+
+  tipos_combustivel: # coluna dim_produto.tipo_combustivel (usar só se o usuário falar do grupo)
+    GASOLINA: ["todas as gasolinas", "gasolina (comum e aditivada)"]
+    DIESEL: ["todos os diesel", "diesel (comum e S10)"]
+
+  bandeiras:         # coluna dim_bandeira.bandeira
+    VIBRA: ["Petrobras", "posto Petrobras", "BR", "posto BR", "BR Distribuidora", "Vibra", "Vibra Energia"]
+    RAIZEN: ["Shell", "posto Shell", "Raízen", "Raizen"]
+    IPIRANGA: ["Ipiranga"]
+    ALE: ["Ale", "Alesat"]
+    TOTALENERGIES: ["Total", "TotalEnergies", "Total Brasil"]
+
+  bandeira_branca:   # usar b.eh_bandeira_branca = true (não pelo nome)
+    termos: ["bandeira branca", "sem bandeira", "posto sem bandeira", "independente",
+             "posto independente", "posto branco", "sem marca"]
+    oposto: ["com bandeira", "bandeirado", "posto de marca", "de distribuidora"]   # eh_bandeira_branca = false
+
+  observacoes_bandeira:
+    - "PETROBRASIL é OUTRA bandeira (não é Petrobras). Nunca usar ILIKE '%PETRO%'."
+    - "RAIZEN MIME é bandeira separada da RAIZEN na ANP; 'Shell'/'Raízen' = só RAIZEN, salvo pedido explícito."
+    - "Bandeiras podem ter acento (SABBÁ, ATLÂNTICA): para nomes fora desta lista, comparar com strip_accents(upper(...))."
+
+  regioes:           # coluna dim_local.regiao_sigla
+    N:  ["Norte", "região Norte"]
+    NE: ["Nordeste", "região Nordeste"]
+    CO: ["Centro-Oeste", "Centro Oeste", "região Centro-Oeste"]
+    SE: ["Sudeste", "região Sudeste"]
+    S:  ["Sul", "região Sul"]
+
+  ufs:               # coluna dim_local.uf
+    AC: ["Acre"]
+    AL: ["Alagoas"]
+    AP: ["Amapá", "Amapa"]
+    AM: ["Amazonas"]
+    BA: ["Bahia"]
+    CE: ["Ceará", "Ceara"]
+    DF: ["Distrito Federal"]
+    ES: ["Espírito Santo", "Espirito Santo"]
+    GO: ["Goiás", "Goias"]
+    MA: ["Maranhão", "Maranhao"]
+    MT: ["Mato Grosso"]
+    MS: ["Mato Grosso do Sul"]
+    MG: ["Minas Gerais", "Minas"]
+    PA: ["Pará", "estado do Pará", "estado do Para"]   # NÃO usar "Para" sozinho: é a preposição "para"
+    PB: ["Paraíba", "Paraiba"]
+    PR: ["Paraná", "Parana"]
+    PE: ["Pernambuco"]
+    PI: ["Piauí", "Piaui"]
+    RJ: ["estado do Rio de Janeiro", "estado do Rio"]
+    RN: ["Rio Grande do Norte"]
+    RS: ["Rio Grande do Sul", "Rio Grande"]
+    RO: ["Rondônia", "Rondonia"]
+    RR: ["Roraima"]
+    SC: ["Santa Catarina"]
+    SP: ["estado de São Paulo", "estado de SP"]
+    SE: ["Sergipe"]
+    TO: ["Tocantins"]
+
+  municipios_apelidos:  # chave = "MUNICIPIO/UF"; sempre filtrar municipio E uf
+    "SAO PAULO/SP":      ["Sampa", "capital paulista", "cidade de São Paulo", "município de São Paulo"]
+    "RIO DE JANEIRO/RJ": ["Rio", "cidade do Rio", "capital fluminense", "município do Rio de Janeiro"]
+    "BELO HORIZONTE/MG": ["BH", "Beagá", "capital mineira"]
+    "FLORIANOPOLIS/SC":  ["Floripa", "capital catarinense"]
+    "PORTO ALEGRE/RS":   ["capital gaúcha"]
+    "BRASILIA/DF":       ["Brasília", "capital federal"]
+    "CURITIBA/PR":       ["capital paranaense"]
+
+  observacoes_local:
+    - "Municípios estão em MAIÚSCULAS e SEM ACENTO: 'São José' -> 'SAO JOSE'."
+    - "Nomes repetidos entre UFs (hoje: VALENCA em BA e RJ): sem a UF, pedir esclarecimento."
+    - "'Estado(s)' = as 27 UFs, INCLUINDO o Distrito Federal (DF), como a ANP apresenta. Só excluir o DF se o
+       usuário pedir. (Decisão do aluno em 23/11.)"
+
+  termos_ambiguos:      # o Orquestrador deve PEDIR ESCLARECIMENTO
+    "São Paulo":      "município (SAO PAULO/SP) ou estado (SP)?"
+    "Rio de Janeiro": "município (RIO DE JANEIRO/RJ) ou estado (RJ)?"
+    "POA":            "Porto Alegre/RS ou o município de Poá/SP (que está na base como 'POA')?"
+    "SP":             "estado de São Paulo ou a bandeira 'SP'? (padrão: estado, se o contexto for local)"
+    "Rio Branco":     "o município (RIO BRANCO/AC) ou a bandeira 'RIO BRANCO'?"
+    "Valença":        "VALENCA/BA ou VALENCA/RJ?"
+    "SE":             "região Sudeste (regiao_sigla = 'SE') ou estado de Sergipe (uf = 'SE')?"
+    "diesel":         "sem detalhe = DIESEL (comum). Se a pergunta comparar diesels, perguntar se inclui S10."
+    "combustível":    "qual produto? (gasolina, etanol, diesel, diesel S10, GNV)"
+
+  termos_fora_da_base:  # o Orquestrador deve explicar que a base NÃO tem
+    "gasolina premium / Podium / V-Power": "não pesquisada; a mais próxima é GASOLINA ADITIVADA (avisar que não é a mesma coisa)"
+    "GLP / gás de cozinha / botijão":      "fora da base (só combustíveis automotivos)"
+    "querosene / Arla 32":                 "não pesquisados"
+    "margem / preço de compra / lucro":    "não disponível (Valor de Compra descartado)"
+    "volume vendido / demanda":            "não disponível"
+
+  metricas:            # palavras -> métrica da seção 4
+    preco_medio: ["preço médio", "média", "valor médio",
+                  "quanto custa / quanto está / preço — de um MUNICÍPIO, UF, REGIÃO ou do Brasil",
+                  "mais caro / mais barato COMPARANDO locais, bandeiras, regiões, produtos ou períodos"]
+    # Correção de 23/11 (achada no golden set, rodada "antes", #1 — correção GERAL, não específica da pergunta):
+    # "preço", "quanto está", "preço atual" de um POSTO ou de um CEP NÃO é preco_medio: segue a R02
+    # (última coleta de CADA posto, listada com razão social e data). Nunca tirar média entre os postos de um CEP.
+    preco_minimo: ["menor preço coletado/encontrado", "preço mínimo", "posto mais barato", "o mais barato que achou"]
+    preco_maximo: ["maior preço coletado/encontrado", "preço máximo", "posto mais caro", "o mais caro que achou"]
+    # Correção de 23/11 (achada nas perguntas de DESENVOLVIMENTO): "mais caro/mais barato" é ambíguo.
+    # Entre GRUPOS (estados, municípios, regiões, bandeiras) = comparar o PREÇO MÉDIO (por posto, R13).
+    # Só é MÁX/MÍN quando fala de um preço coletado ou de um POSTO ("maior preço encontrado", "posto mais caro").
+    amplitude: ["diferença entre o mais caro e o mais barato", "dispersão", "spread", "variação entre postos"]
+    num_postos: ["quantos postos", "número de postos", "quantidade de postos"]
+    variacao_percentual: ["variação", "aumento", "alta", "queda", "subiu", "caiu", "evolução em %", "reajuste"]
+    razao_etanol_gasolina: ["etanol compensa", "vale a pena o etanol", "regra dos 70%", "paridade", "álcool ou gasolina"]
+    diferenca_bandeira_vs_branca: ["bandeira branca é mais barata", "diferença bandeira x branca", "compensa posto sem bandeira"]
+
+  periodos:            # dim_tempo; termos relativos ("atual", "último mês", "recente") estão em regras_de_negocio
+    meses: {janeiro: 1, fevereiro: 2, março: 3, abril: 4, maio: 5, junho: 6,
+            julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12}
+    trimestre: {"1º trimestre": 1, "primeiro trimestre": 1, "2º trimestre": 2, "segundo trimestre": 2,
+                "3º trimestre": 3, "terceiro trimestre": 3, "4º trimestre": 4, "quarto trimestre": 4}
+    semestre:  {"1º semestre": 1, "primeiro semestre": 1, "2º semestre": 2, "segundo semestre": 2}
+
+# -----------------------------------------------------------------------------
+# 6. REGRAS DE NEGOCIO  (passo 2.5.5)
+# -----------------------------------------------------------------------------
+# Regras decididas pelo aluno. TODA consulta deve respeitá-las.
+# Datas: a base vai de 01/01/2020 a 30/06/2026. Termos relativos são calculados
+# a partir da ÚLTIMA DATA DA BASE, nunca do relógio.
+# Cada regra tem um id (R01...) para ser citada na análise de erros (Etapa 4).
+regras_de_negocio:
+
+  - id: R01
+    nome: datas_relativas_pela_base
+    regra: >
+      "Atual", "último mês", "recente", "este ano", "ano passado" são calculados a partir
+      da última data com coleta (MAX(f.data)), NUNCA com CURRENT_DATE / now() / today().
+    por_que: "Hoje (relógio) é posterior ao fim da base: CURRENT_DATE dá resultado vazio."
+    sql: |
+      -- ano "atual" da base e ano passado
+      SELECT year(MAX(data)) AS ano_atual, year(MAX(data)) - 1 AS ano_passado FROM fato_precos
+    observacao: "'Este ano' = 2026, mas só até jun: avisar que o ano está incompleto."
+
+  - id: R02
+    nome: preco_atual_do_posto
+    regra: "Preço atual de um posto (ou CEP) = última coleta DAQUELE POSTO PARA AQUELE PRODUTO."
+    resposta_deve_ter: ["data da coleta", "razão social", "aviso se a coleta for antiga (R07)"]
+    observacao: >
+      Um CEP pode ter vários postos: listar TODOS, uma linha por posto (razão social, preço, data da coleta,
+      coleta_antiga). NUNCA calcular média entre os postos do CEP, mesmo que o usuário diga "preço do CEP"
+      — cada posto tem o seu preço e a sua data.
+    sql: |
+      SELECT p.razao_social, p.cep, f.data AS data_coleta, f.valor_venda
+      FROM fato_precos f
+      JOIN dim_posto p    ON p.cnpj = f.cnpj
+      JOIN dim_produto pr ON pr.id_produto = f.id_produto
+      WHERE <filtro do posto ou CEP> AND pr.produto = '<PRODUTO>'
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY f.cnpj ORDER BY f.data DESC) = 1
+
+  - id: R03
+    nome: cep_com_ou_sem_hifen
+    regra: "Comparar CEP só pelos dígitos (o usuário pode digitar 51030300 ou 51030-300)."
+    sql: "regexp_replace(p.cep, '[^0-9]', '', 'g') = regexp_replace('<CEP digitado>', '[^0-9]', '', 'g')"
+    exemplo:
+      pergunta: "Qual o preço atual da gasolina no CEP 51030300?"
+      resultado_teste: "4 postos; coletas de 29/06/2026, 29/06/2026, 08/09/2025 e 22/06/2022 (as 2 últimas antigas)."
+      sql: |
+        WITH janela AS (
+          SELECT CAST(date_trunc('month', MAX(data)) - INTERVAL 2 MONTH AS DATE) AS inicio FROM fato_precos
+        )
+        SELECT p.razao_social, p.cep, f.data AS data_coleta, f.valor_venda,
+               f.data < (SELECT inicio FROM janela) AS coleta_antiga
+        FROM fato_precos f
+        JOIN dim_posto p    ON p.cnpj = f.cnpj
+        JOIN dim_produto pr ON pr.id_produto = f.id_produto
+        WHERE regexp_replace(p.cep, '[^0-9]', '', 'g') = regexp_replace('51030300', '[^0-9]', '', 'g')
+          AND pr.produto = 'GASOLINA'
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY f.cnpj ORDER BY f.data DESC) = 1
+        ORDER BY f.data DESC
+
+  - id: R04
+    nome: ultimo_mes_do_recorte
+    regra: >
+      "Último mês" e "preço atual" de UM município/UF/região/Brasil = último mês COM PESQUISA
+      dentro do recorte filtrado (ex.: último mês com coleta de etanol em Goiânia), com média por posto.
+    excecao: >
+      Em rankings/comparações ENTRE locais ("qual município/estado tem o preço atual mais alto", "os 5 mais
+      baratos hoje"), cada local NÃO usa o seu próprio último mês (os períodos ficariam diferentes): sem período
+      informado vale a R05 (último TRIMESTRE da base); com "último mês" explícito, é o último mês com pesquisa no
+      recorte todo, o mesmo para todos. (Correção de 23/11.)
+    resposta_deve_ter: ["mês (AAAA-MM)", "1ª e última data de coleta usadas", "nº de postos"]
+    exemplo:
+      pergunta: "Qual o preço atual do etanol em Goiânia?"
+      resultado_teste: "R$ 4,534 · 49 postos · 2026-06 (01/06 a 30/06/2026)"
+      sql: |
+        WITH recorte AS (
+          SELECT f.cnpj, f.data, f.valor_venda, t.ano_mes
+          FROM fato_precos f
+          JOIN dim_produto pr ON pr.id_produto = f.id_produto
+          JOIN dim_local l    ON l.id_local    = f.id_local
+          JOIN dim_tempo t    ON t.data        = f.data
+          WHERE pr.produto = 'ETANOL' AND l.municipio = 'GOIANIA' AND l.uf = 'GO'
+        ),
+        ultimo_mes AS (SELECT * FROM recorte WHERE ano_mes = (SELECT MAX(ano_mes) FROM recorte)),
+        por_posto  AS (SELECT cnpj, AVG(valor_venda) AS preco_posto FROM ultimo_mes GROUP BY cnpj)
+        SELECT (SELECT ROUND(AVG(preco_posto), 3) FROM por_posto) AS preco_medio,
+               COUNT(DISTINCT cnpj) AS num_postos, MAX(ano_mes) AS mes,
+               MIN(data) AS primeira_coleta, MAX(data) AS ultima_coleta
+        FROM ultimo_mes
+
+  - id: R05
+    nome: rankings_entre_locais
+    regra: >
+      Rankings entre municípios/UFs/regiões usam o ÚLTIMO TRIMESTRE com pesquisa NA BASE
+      (o mesmo período para todos) e só incluem locais com pelo menos 5 postos pesquisados.
+      "Mais caro"/"mais barato" num ranking de locais compara o PREÇO MÉDIO (por posto, R13), nunca o MAX/MIN.
+      PRECEDÊNCIA (correção de 23/11): num ranking/comparação entre locais SEM período informado ("atual",
+      "hoje", "agora"), vale o ÚLTIMO TRIMESTRE DA BASE — esta R05 prevalece sobre a R04 (que é para UM local).
+      Se o usuário disser explicitamente "último mês", usa-se o último mês com pesquisa no recorte TODO
+      (o MESMO mês para todos os locais), nunca o último mês de cada local.
+    quando_o_usuario_da_o_periodo: >
+      O último trimestre vale só quando o usuário NÃO informa o período. Com período informado
+      (ex.: "em 2025", "1º sem/2025 x 1º sem/2026"), usa-se o período dele, mantendo o mínimo
+      de 5 postos em CADA período comparado.
+    resposta_deve_ter: ["trimestre usado e intervalo de datas", "nº de postos de cada local"]
+    exemplo:
+      pergunta: "Quais os 5 municípios com o diesel S10 mais barato?"
+      resultado_teste: "2º tri/2026: NOVO HAMBURGO/RS R$ 6,683 (15 postos) em 1º."
+      sql: |
+        WITH periodo AS (
+          SELECT year(MAX(data)) AS ano, quarter(MAX(data)) AS tri FROM fato_precos
+        ),
+        por_posto AS (
+          SELECT l.municipio, l.uf, f.cnpj, AVG(f.valor_venda) AS preco_posto,
+                 MIN(f.data) AS d1, MAX(f.data) AS d2
+          FROM fato_precos f
+          JOIN dim_produto pr ON pr.id_produto = f.id_produto
+          JOIN dim_local l    ON l.id_local    = f.id_local
+          JOIN dim_tempo t    ON t.data        = f.data
+          JOIN periodo        ON t.ano = periodo.ano AND t.trimestre = periodo.tri
+          WHERE pr.produto = 'DIESEL S10'
+          GROUP BY l.municipio, l.uf, f.cnpj
+        )
+        SELECT municipio, uf, ROUND(AVG(preco_posto), 3) AS preco_medio, COUNT(*) AS num_postos,
+               MIN(d1) AS primeira_coleta, MAX(d2) AS ultima_coleta
+        FROM por_posto
+        GROUP BY municipio, uf
+        HAVING COUNT(*) >= 5
+        ORDER BY preco_medio ASC
+        LIMIT 5
+
+  - id: R06
+    nome: coleta_recente
+    regra: >
+      "Recente" / "agora" para indicar ou listar POSTOS = os últimos 3 meses até o último mês
+      com dados na base (hoje: 01/04/2026 a 30/06/2026), usando a última coleta de cada posto na janela.
+    exemplo:
+      pergunta: "Quais postos de Recife têm a gasolina aditivada mais barata agora?"
+      resultado_teste: "1º: 247 COMERCIO LTDA (Afogados), R$ 6,93 em 17/06/2026."
+      sql: |
+        WITH janela AS (
+          SELECT CAST(date_trunc('month', MAX(data)) - INTERVAL 2 MONTH AS DATE) AS inicio,
+                 MAX(data) AS fim
+          FROM fato_precos
+        )
+        SELECT p.razao_social, p.bairro, f.data AS data_coleta, f.valor_venda
+        FROM fato_precos f
+        JOIN dim_posto p    ON p.cnpj = f.cnpj
+        JOIN dim_produto pr ON pr.id_produto = f.id_produto
+        JOIN dim_local l    ON l.id_local    = f.id_local
+        JOIN janela         ON f.data BETWEEN janela.inicio AND janela.fim
+        WHERE pr.produto = 'GASOLINA ADITIVADA' AND l.municipio = 'RECIFE' AND l.uf = 'PE'
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY f.cnpj ORDER BY f.data DESC) = 1
+        ORDER BY f.valor_venda
+        LIMIT 5
+
+  - id: R07
+    nome: aviso_de_coleta_antiga
+    regra: "Se a data usada for ANTERIOR à janela de coleta recente (R06), avisar que o dado é antigo e dizer a data."
+    sql: "f.data < (SELECT CAST(date_trunc('month', MAX(data)) - INTERVAL 2 MONTH AS DATE) FROM fato_precos) AS coleta_antiga"
+
+  - id: R08
+    nome: etanol_compensa
+    regra: "Etanol compensa se preço etanol ÷ preço gasolina COMUM ≤ 0,70, no MESMO posto e na MESMA data."
+    ver_metrica: razao_etanol_gasolina
+    observacao: >
+      Para 'coleta mais recente', combinar com R06: dentro da janela, montar primeiro os pares (cnpj, data) com
+      etanol E gasolina e só então pegar o par mais recente de cada posto (ver métrica razao_etanol_gasolina).
+
+  - id: R09
+    nome: sempre_informar_periodo
+    regra: >
+      Toda resposta sobre "atual", "último mês" ou "recente" informa a data da pesquisa:
+      posto -> data da coleta; agregado -> mês/trimestre e 1ª/última data usadas.
+    como: "Incluir no SELECT as colunas da métrica periodo_da_amostra (MIN/MAX de f.data)."
+
+  - id: R10
+    nome: gasolina_e_comum
+    regra: "'Gasolina' sem qualificação = GASOLINA (comum). Aditivada só se o usuário pedir."
+
+  - id: R11
+    nome: nao_misturar_unidades
+    regra: >
+      Nunca somar, comparar ou tirar média entre GNV (R$/m³) e os demais (R$/litro).
+      Em rankings de 'combustível mais caro' entre produtos, mostrar o GNV à parte, com aviso.
+
+  - id: R12
+    nome: municipio_com_uf
+    regra: "Filtrar município SEMPRE com UF; nome em MAIÚSCULAS e SEM ACENTO (ver sinonimos)."
+
+  - id: R13
+    nome: media_por_posto
+    regra: "Preço médio = média por posto (ver padrao_media_por_posto). Nunca AVG(f.valor_venda) direto como resposta."
+
+  - id: R14
+    nome: precos_fora_do_padrao
+    regra: "Preços muito altos ou baixos NÃO são removidos nem marcados: entram no cálculo; o usuário avalia."
+
+# Checklist que o Agente SQL confere ANTES de executar:
+checklist_sql:
+  - "Produto filtrado (ou agrupado)? 'gasolina' virou 'GASOLINA'? (R10, R11)"
+  - "Município com UF e sem acento? (R12)"
+  - "Nenhum CURRENT_DATE / now() / today()? (R01)"
+  - "Média feita por posto? (R13)"
+  - "Ranking: último trimestre da base + HAVING >= 5 postos? (R05)"
+  - "SELECT traz as datas usadas (MIN/MAX de f.data)? (R09)"
+  - "Valores de filtro iguais aos da base (sinonimos), com '=' e não ILIKE '%...%'?"
+  - "O usuário comparou opções que ELE citou (ex.: 'Shell, BR ou Ipiranga', 'etanol ou gasolina')? Traga TODAS,
+     cada uma com o seu valor, ordenadas — sem LIMIT 1 (quem aponta a vencedora é a resposta). (Correção de 23/11.)"
+  - "A última consulta executada com sucesso é a resposta COMPLETA? (nada de paginar com OFFSET)"
+
+# Ressalvas que o Agente Analista acrescenta à resposta quando se aplicam:
+ressalvas:
+  amostra: "A ANP pesquisa uma AMOSTRA de postos e municípios, não todos."
+  coleta_antiga: "O preço é da última coleta disponível (<data>), que é antiga (R07)."
+  setembro_2020: "Não há coleta em set/2020 (lacuna da ANP). Séries mensais de 2020 terão esse buraco."
+  ano_incompleto: "2026 só tem dados até 30/06/2026."
+  amostra_pequena: "Poucos postos no recorte (< 5): a média pode não representar o local (avisar, não recusar)."
+  amostra_muda: "Em comparações entre períodos, os postos pesquisados podem não ser os mesmos."
