@@ -145,6 +145,10 @@
 - 🔄 5.3 `USO_DE_IA.md` (atualizar ao longo do projeto; preencher correções manuais)
 - ✅ 5.4 Revisar estrutura do repositório (seção 5 do enunciado) — conferida antes do 1º commit (57 arquivos)
 - ✅ 5.5 Conferir: nenhuma chave de API no GitHub — `.env` fora, nenhum padrão `sk-...` nos arquivos enviados
+- ✅ 5.6 App publicado no Streamlit Community Cloud (pelo aluno): https://iaprecoscombustivel.streamlit.app/
+  - ✅ `app.py` lê a chave dos Secrets do Streamlit; `.streamlit/secrets.toml` no `.gitignore`
+  - ⬜ Aluno colar `OPENAI_API_KEY` em Settings → Secrets e testar uma pergunta online
+  - 💡 Projeto futuro (decisão do aluno): senha de acesso e limite de perguntas por sessão
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação

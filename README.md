@@ -18,6 +18,7 @@ Três agentes de IA consultam a base de dados da ANP **via SQL** (nunca colocand
 | **Matéria** | Artificial Intelligence |
 | **Professor** | Prof. Me. Cesar Augusto Cardoso Caetano |
 | **Grupo** | Douglas H. da Silva · Jeferson Stenzel · Leonardo M. L. Rodrigues · Leonardo M. Lima |
+| **App online** | **https://iaprecoscombustivel.streamlit.app/** (Streamlit Community Cloud) |
 
 <p align="center"><img src="docs/imagens/app_tela_inicial.jpg" alt="Tela inicial do analista virtual" width="780"></p>
 
@@ -116,6 +117,14 @@ python src/verificar_openai.py
 ```bash
 streamlit run src/app.py
 ```
+
+**Publicar no Streamlit Community Cloud** — em `share.streamlit.io`, crie o app a partir deste repositório
+(branch `main`, arquivo `src/app.py`) e cole a chave em **Settings → Secrets** (formato TOML):
+```toml
+OPENAI_API_KEY = "sk-..."
+```
+A chave fica só nos Secrets do Streamlit (criptografados), nunca no GitHub; o `app.py` copia os Secrets para as
+variáveis de ambiente que o `llm.py` lê.
 
 **Outras formas de usar**
 | Comando | O que faz |
@@ -270,6 +279,11 @@ custaram menos de US$ 8. Cada chamada é registrada em `logs/uso_llm.csv`.
 - Preços fora do padrão não são removidos nem marcados (decisão do grupo): o usuário avalia.
 - Respostas com dados levam em média ~20 s (às vezes mais, conforme a latência da API).
 - A acurácia medida (90–95%) tem incerteza de ±1–2 perguntas por rodada, por ser um sistema não determinístico.
+- O app online não tem controle de acesso: qualquer pessoa com o link usa os créditos da chave configurada
+  (o limite de gastos fica no painel da OpenAI).
+
+**Projetos futuros:** senha de acesso e limite de perguntas por sessão no app online; login de usuários;
+cache de respostas repetidas; melhorar o texto do Analista quando a tabela tem mais de 20 linhas.
 
 ## 11. Uso de IA no desenvolvimento
 

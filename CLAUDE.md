@@ -111,6 +111,10 @@
     `.env` fora; conferido). Git em `C:\Program Files\Git\cmd\git.exe` (o terminal da IA não tem o `git` no PATH).
     Login do GitHub salvo no Git Credential Manager (feito pelo aluno no navegador). O repositório veio com um README
     automático: foi feito merge mantendo o README do projeto (sem `--force`). Commits com "Co-Authored-By: Claude".
+  - ✅ 5.4 **App online** (publicado pelo aluno no Streamlit Community Cloud): https://iaprecoscombustivel.streamlit.app/
+    — `app.py` copia `st.secrets` para variáveis de ambiente (chave nos Secrets, nunca no Git); `.streamlit/secrets.toml`
+    no `.gitignore`. Senha/limite por sessão = **projeto futuro** (decisão do aluno: se o saldo zerar, tudo bem).
+    Falta o aluno colar `OPENAI_API_KEY` em Settings → Secrets e testar.
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
     explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
   Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).

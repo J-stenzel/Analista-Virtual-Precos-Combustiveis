@@ -10,12 +10,23 @@ um gráfico automático quando faz sentido (feito pelo código, sem LLM) e o tem
 Visual: identidade inspirada no site da Faculdade Impacta (fundo escuro, azul #116FFF, ciano #00D8FF, Montserrat).
 """
 import base64
+import os
 import sys
 from pathlib import Path
 
 import altair as alt
 import pandas as pd
 import streamlit as st
+
+# Streamlit Community Cloud: a chave (e, se quiser, os modelos) fica em "Secrets" — NUNCA no GitHub.
+# Copia os Secrets para variáveis de ambiente ANTES de importar o llm.py (que lê os.getenv).
+# Localmente não há Secrets: nada acontece e vale o .env, como sempre.
+try:
+    for _nome, _valor in st.secrets.items():
+        if isinstance(_valor, (str, int, float)):
+            os.environ.setdefault(_nome, str(_valor))
+except Exception:            # sem arquivo de Secrets (uso local): o st.secrets avisa com um erro — é esperado
+    pass
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))
