@@ -107,9 +107,12 @@
     Mermaid da arquitetura, como rodar (venv, banco, `.env`, app, CLI, testes), dados e modelo, camada semântica,
     guardrails, avaliação (4 rodadas), stack e decisões, estrutura, limitações, uso de IA. Números e arquivos citados
     conferidos (21 arquivos existem; 55 testes nas tools).
-  - ⬜ **PRÓXIMO PASSO:** Git/GitHub (aluno instala o Git e cria repo privado vazio → IA faz `git init`, mostra a
-    lista de arquivos, 1º commit e push só com OK) → 5.4/5.5 revisar estrutura e conferir que nenhuma chave sobe →
-    Etapa 6 (roteiro da apresentação).
+  - ✅ 5.3 **GitHub:** https://github.com/J-stenzel/Analista-Virtual-Precos-Combustiveis (branch `main`, 57 arquivos,
+    `.env` fora; conferido). Git em `C:\Program Files\Git\cmd\git.exe` (o terminal da IA não tem o `git` no PATH).
+    Login do GitHub salvo no Git Credential Manager (feito pelo aluno no navegador). O repositório veio com um README
+    automático: foi feito merge mantendo o README do projeto (sem `--force`). Commits com "Co-Authored-By: Claude".
+  - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
+    explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
   Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).
   - Na construção dos agentes: separar instrução × dado nos prompts (pergunta só na mensagem do usuário; resultado do
     banco marcado como dados); pedidos de alterar dados/revelar segredos = fora de escopo.

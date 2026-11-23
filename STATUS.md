@@ -13,7 +13,7 @@
 | 2.5 Golden set | `eval/golden_set.csv` (20 perguntas) | ✅ |
 | 3. Agentes | Checkpoint 2 (demo com ≥ 3 perguntas) — falta apresentar ao vivo | 🔄 |
 | 4. Avaliação | `resultados.csv` + `analise_erros.md` (4 rodadas: 95/95/90/90%) | ✅ |
-| 5. Acabamento | interface Streamlit ✅ + README ✅ — falta Git/GitHub | 🔄 |
+| 5. Acabamento | interface Streamlit ✅ + README ✅ + GitHub ✅ | ✅ |
 | 6. Apresentação | apresentação do grupo | ⬜ |
 
 ---
@@ -25,7 +25,7 @@
 - ✅ `requirements.txt`
 - ✅ `.gitignore` (`.env`, dados grandes, `.venv`)
 - ✅ `.env.example`
-- ⬜ Criar repositório no GitHub e fazer o 1º commit
+- ✅ Repositório no GitHub (privado) e 1º commit: https://github.com/J-stenzel/Analista-Virtual-Precos-Combustiveis
 - ✅ Definir LLM: **OpenAI**, modelos mesclados por agente (Orquestrador gpt-6-luna · SQL gpt-6.2-sol · Analista gpt-6-luna — ver `docs/escolha_modelos.md`)
 - ✅ `.env` com a chave da OpenAI, conferido com `python src/verificar_openai.py` (23/11: chave aceita, modelos disponíveis)
 
@@ -129,7 +129,7 @@
 - ✅ 4.8 Melhorias sem nova rodada no golden set (Orquestrador → terra; Analista recebe o SQL; comparar todas as
   opções citadas) validadas no dev: 4/4
 
-## 5. Acabamento 🔄
+## 5. Acabamento ✅
 - ✅ 5.1 `src/app.py` — interface Streamlit (texto + tabela + SQL usado), testada no navegador
   - ✅ Cabeçalho: título do projeto, curso, matéria, professor; barra lateral: desenvolvedores, fonte ANP, exemplos, modelos, gasto
   - ✅ Conversa com histórico (esclarecimento), progresso por agente, gráfico automático, CSV, detalhes da execução
@@ -143,8 +143,8 @@
   - ✅ Link para baixar os dados da ANP
   - ✅ Resumo da avaliação, guardrails, limitações, print da tela
 - 🔄 5.3 `USO_DE_IA.md` (atualizar ao longo do projeto; preencher correções manuais)
-- ⬜ 5.4 Revisar estrutura do repositório (seção 5 do enunciado)
-- ⬜ 5.5 Conferir: nenhuma chave de API no GitHub
+- ✅ 5.4 Revisar estrutura do repositório (seção 5 do enunciado) — conferida antes do 1º commit (57 arquivos)
+- ✅ 5.5 Conferir: nenhuma chave de API no GitHub — `.env` fora, nenhum padrão `sk-...` nos arquivos enviados
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação
