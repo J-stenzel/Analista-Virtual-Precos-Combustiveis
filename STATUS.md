@@ -152,6 +152,9 @@
 - ✅ 5.7 Ajustes visuais pedidos pelo aluno: pergunta (azul) e resposta (ciano) com borda, fundo e sombra próprios;
   link do LinkedIn no chip do professor e no nome do Jeferson (mesma aparência). Testado no navegador embutido.
   - ✅ Título do professor trocado para "Prof. Dr." no app e no README (decisão do aluno; LinkedIn mostra PhD)
+  - ✅ Ordem da resposta: texto → gráfico → tabela (+ CSV) → SQL (pedido do aluno)
+  - ✅ Bug corrigido: gráfico de BARRAS nunca aparecia (pandas 3 usa o tipo "str" para texto, não "object");
+    testado com o ranking de 5 estados (etanol)
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação

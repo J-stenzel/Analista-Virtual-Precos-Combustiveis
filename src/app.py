@@ -185,7 +185,9 @@ def grafico_automatico(df: pd.DataFrame) -> None:
             tooltip=[tempo, metrica])
         st.altair_chart(grafico, use_container_width=True)
         return
-    categoria = next((c for c in df.columns if df[c].dtype == object and df[c].nunique() == len(df)), None)
+    # Coluna de texto com um valor por linha (uf, município, bandeira…). No pandas 3 o texto é "str", não "object".
+    categoria = next((c for c in df.columns if (pd.api.types.is_string_dtype(df[c]) or df[c].dtype == object)
+                      and df[c].nunique() == len(df)), None)
     if categoria and len(df) <= 30:
         # Barras: eixo começa no zero (o comprimento da barra representa o valor)
         grafico = alt.Chart(df).mark_bar(color="#116FFF", cornerRadiusEnd=4).encode(
@@ -214,11 +216,12 @@ def mostrar_resposta(res: dict) -> None:
                     '(por exemplo: <i>"o município"</i> ou <i>"o estado"</i>). Eu lembro da sua pergunta anterior '
                     'e completo a consulta.</div>', unsafe_allow_html=True)
     if res.get("linhas"):
+        # Ordem: texto (acima) → gráfico → tabela (+ CSV) → SQL
         df = pd.DataFrame(res["linhas"], columns=res["colunas"])
+        grafico_automatico(df)
         st.dataframe(df, hide_index=True)
         st.download_button("⬇️ Baixar tabela (CSV)", df.to_csv(index=False).encode("utf-8-sig"),
                            file_name="resultado.csv", mime="text/csv", key=f"csv_{id(res)}")
-        grafico_automatico(df)
         st.markdown("**SQL usado** (somente leitura, validado antes de executar):")
         st.code(res["sql"], language="sql")
     with st.expander("🔎 Detalhes da execução"):

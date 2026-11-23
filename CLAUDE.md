@@ -118,6 +118,7 @@
   - ✅ 5.5 Ajustes visuais: pergunta (azul) × resposta (ciano) com borda/fundo/sombra (marcadores `.msg-usuario` /
     `.msg-analista` + CSS `:has()`); LinkedIn no chip do professor e no nome do Jeferson (aparência igual).
     Título do professor: **Prof. Dr.** (decisão do aluno, 23/11 — o LinkedIn mostra PhD).
+    Ordem da resposta: texto → gráfico → tabela (+ CSV) → SQL. Bug do gráfico de barras corrigido (pandas 3: texto = "str").
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
     explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
   Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).
