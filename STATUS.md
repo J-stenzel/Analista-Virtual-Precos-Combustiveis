@@ -147,8 +147,11 @@
 - ✅ 5.5 Conferir: nenhuma chave de API no GitHub — `.env` fora, nenhum padrão `sk-...` nos arquivos enviados
 - ✅ 5.6 App publicado no Streamlit Community Cloud (pelo aluno): https://iaprecoscombustivel.streamlit.app/
   - ✅ `app.py` lê a chave dos Secrets do Streamlit; `.streamlit/secrets.toml` no `.gitignore`
-  - ⬜ Aluno colar `OPENAI_API_KEY` em Settings → Secrets e testar uma pergunta online
+  - ✅ Aluno colou `OPENAI_API_KEY` em Settings → Secrets e testou online ("funcionou e ficou muito bom")
   - 💡 Projeto futuro (decisão do aluno): senha de acesso e limite de perguntas por sessão
+- ✅ 5.7 Ajustes visuais pedidos pelo aluno: pergunta (azul) e resposta (ciano) com borda, fundo e sombra próprios;
+  link do LinkedIn no chip do professor e no nome do Jeferson (mesma aparência). Testado no navegador embutido.
+  - ⬜ Aluno confirmar o título do professor ("Me." ou "Dr.") — no LinkedIn aparece PhD
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação

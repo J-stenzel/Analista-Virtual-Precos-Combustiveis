@@ -44,6 +44,7 @@
 | 23/11/2026 | README (5.2) | Escreveu o `README.md` (diagrama Mermaid, como rodar, dados, camada semântica, guardrails, avaliação, stack e decisões, estrutura, limitações), copiou prints da tela para `docs/imagens/` e conferiu números e arquivos citados (corrigiu "25" → "27" ataques bloqueados) | Aluno revisou e aprovou o README |
 | 23/11/2026 | GitHub (5.3) | Criou o repositório local, simulou e conferiu os 57 arquivos (sem `.env`, logs, CSVs nem chaves), fez o 1º commit, juntou o README automático do GitHub mantendo o do projeto (sem forçar o envio) e conferiu que o GitHub ficou igual ao local | Aluno instalou o Git, criou o repositório privado e fez o login no GitHub pelo navegador (a IA nunca viu credenciais) |
 | 23/11/2026 | App online (Streamlit Cloud) | Conferiu o app publicado, fez o `app.py` ler a chave dos Secrets, protegeu `.streamlit/secrets.toml` no `.gitignore`, explicou o risco de uso dos créditos e escreveu o tutorial de como colar a chave | **Aluno publicou o app sozinho** e decidiu deixar senha/limite como projeto futuro |
+| 23/11/2026 | Ajustes visuais (5.7) | Deu à pergunta e à resposta bordas, fundos e sombras próprios (marcador invisível + CSS `:has()`), colocou o link do LinkedIn no chip do professor e no nome do Jeferson sem mudar a aparência e testou no navegador embutido | **Aluno testou o app online, pediu os ajustes e forneceu os links**; levantou a dúvida sobre o título do professor (Me. × PhD) |
 
 ## Correções manuais
 - (preencher: o que precisou ser ajustado à mão no código gerado)

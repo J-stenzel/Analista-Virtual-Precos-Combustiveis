@@ -41,7 +41,12 @@ SUBTITULO = "Projeto Final — Do BI ao Analista Virtual"
 CURSO = "Tecnólogo em Banco de Dados — Faculdade de Tecnologia Impacta"
 MATERIA = "Artificial Intelligence"
 PROFESSOR = "Prof. Me. Cesar Augusto Cardoso Caetano"
-DESENVOLVEDORES = ["Douglas H. da Silva", "Jeferson Stenzel", "Leonardo M. L. Rodrigues", "Leonardo M. Lima"]
+PROFESSOR_URL = "https://www.linkedin.com/in/cesaraccaetano/"
+# (nome, link do LinkedIn ou None) — o link não muda a aparência do nome
+DESENVOLVEDORES = [("Douglas H. da Silva", None),
+                   ("Jeferson Stenzel", "https://www.linkedin.com/in/jeferson-stenzel/"),
+                   ("Leonardo M. L. Rodrigues", None),
+                   ("Leonardo M. Lima", None)]
 FONTE_URL = "https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis"
 LOGO_IMPACTA = RAIZ / "assets" / "logo_impacta.png"
 LOGO_ANP = RAIZ / "assets" / "logo_anp.png"
@@ -116,6 +121,12 @@ html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { fon
 .chips { margin: 4px 0 16px 0; }
 .chip { display: inline-block; border: 1.5px solid #116FFF; color: #FFFFFF; border-radius: 50px;
     padding: 4px 14px; margin: 4px 8px 4px 0; font-size: 0.80rem; font-weight: 600; background: rgba(17,111,255,.10); }
+/* Chip com link (professor): mesma aparência; ao passar o mouse, preenche de azul */
+a.chip, a.chip:visited { color: #FFFFFF !important; text-decoration: none !important; transition: background .15s; }
+a.chip:hover { background: #116FFF; }
+/* Nome com link (desenvolvedor): mesmo formato do texto; sublinha só ao passar o mouse */
+[data-testid="stSidebar"] a.link-discreto { color: inherit !important; text-decoration: none; }
+[data-testid="stSidebar"] a.link-discreto:hover { text-decoration: underline; }
 
 /* Faixa de destaque e cartões */
 .destaque { background: linear-gradient(100deg, #116FFF 0%, #0A88F4 55%, #00D8FF 100%); color: #FFFFFF;
@@ -128,8 +139,18 @@ html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { fon
 .cartao ul { margin: 0; padding-left: 18px; color: rgba(255,255,255,.80); font-size: 0.88rem; }
 @media (max-width: 900px) { .cartoes { grid-template-columns: 1fr; } }
 
-/* Mensagens da conversa */
-[data-testid="stChatMessage"] { background: #10222A; border: 1px solid #1B3440; border-radius: 16px; padding: 12px 16px; }
+/* Mensagens da conversa: pergunta (azul) e resposta (ciano) bem separadas.
+   Cada mensagem leva um marcador invisível (.msg-usuario / .msg-analista) e o CSS usa :has() para estilizá-la. */
+[data-testid="stChatMessage"] { background: #10222A; border: 1px solid #1B3440; border-radius: 16px; padding: 12px 16px;
+    margin-bottom: 10px; }
+[data-testid="stChatMessage"]:has(.msg-usuario) {
+    background: linear-gradient(100deg, rgba(17,111,255,.28) 0%, rgba(10,136,244,.14) 100%);
+    border: 1.5px solid #116FFF; border-left: 6px solid #116FFF; box-shadow: 0 4px 16px rgba(17,111,255,.20); }
+[data-testid="stChatMessage"]:has(.msg-usuario) p { color: #FFFFFF; font-weight: 600; font-size: 1.02rem; }
+[data-testid="stChatMessage"]:has(.msg-analista) {
+    background: #13252D; border: 1.5px solid rgba(0,216,255,.45); border-left: 6px solid #00D8FF;
+    box-shadow: 0 4px 18px rgba(0,216,255,.10); }
+.msg-usuario, .msg-analista { display: none; }
 .classe { display: inline-block; color: #FFFFFF; font-weight: 700; font-size: 0.76rem; border-radius: 50px;
     padding: 3px 12px; margin-bottom: 6px; }
 .aviso-esclarecer { border: 1.5px dashed #FF8A00; background: rgba(255,138,0,.10); border-radius: 12px;
@@ -173,7 +194,17 @@ def grafico_automatico(df: pd.DataFrame) -> None:
         st.altair_chart(grafico, use_container_width=True)
 
 
+MARCA_USUARIO = '<span class="msg-usuario"></span>'      # marcadores para o CSS (ver "Mensagens da conversa")
+MARCA_ANALISTA = '<span class="msg-analista"></span>'
+
+
+def mostrar_pergunta(texto: str) -> None:
+    st.markdown(MARCA_USUARIO, unsafe_allow_html=True)
+    st.markdown(texto_seguro(texto))
+
+
 def mostrar_resposta(res: dict) -> None:
+    st.markdown(MARCA_ANALISTA, unsafe_allow_html=True)
     nome, cor, _ = CLASSES.get(res["classe"], (res["classe"], "#5B6B82", ""))
     st.markdown(f'<span class="classe" style="background:{cor}">{nome}</span>', unsafe_allow_html=True)
     st.markdown(texto_seguro(res["resposta"]))
@@ -220,8 +251,10 @@ if "mensagens" not in st.session_state:
 with st.sidebar:
     st.markdown('<div class="lateral-titulo">Projeto</div>'
                 f'<div class="lateral-texto"><b>{PROJETO}</b><br>{SUBTITULO}</div>', unsafe_allow_html=True)
+    nomes = [f'<a class="link-discreto" href="{url}" target="_blank" title="LinkedIn de {nome}">{nome}</a>'
+             if url else nome for nome, url in DESENVOLVEDORES]
     st.markdown('<div class="lateral-titulo">Desenvolvedores</div><div class="lateral-texto">'
-                + "<br>".join(DESENVOLVEDORES) + "</div>", unsafe_allow_html=True)
+                + "<br>".join(nomes) + "</div>", unsafe_allow_html=True)
     st.markdown('<div class="lateral-titulo">Fonte dos dados</div>'
                 f'<div class="lateral-texto"><a href="{FONTE_URL}" target="_blank">ANP — Série Histórica de Preços '
                 'de Combustíveis</a><br>jan/2020 a jun/2026 · amostra de postos</div>', unsafe_allow_html=True)
@@ -263,7 +296,7 @@ st.markdown(f"""
   {bloco_logos}
 </div>
 <div class="chips">
-  <span class="chip">🎓 {CURSO}</span><span class="chip">📘 Matéria: {MATERIA}</span><span class="chip">👨‍🏫 {PROFESSOR}</span>
+  <span class="chip">🎓 {CURSO}</span><span class="chip">📘 Matéria: {MATERIA}</span><a class="chip" href="{PROFESSOR_URL}" target="_blank" title="LinkedIn do professor">👨‍🏫 {PROFESSOR}</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -300,7 +333,7 @@ for msg in st.session_state.mensagens:
     with st.chat_message("user" if msg["papel"] == "usuario" else "assistant",
                          avatar="🧑" if msg["papel"] == "usuario" else "⛽"):
         if msg["papel"] == "usuario":
-            st.markdown(texto_seguro(msg["texto"]))
+            mostrar_pergunta(msg["texto"])
         else:
             mostrar_resposta(msg["res"])
 
@@ -314,8 +347,9 @@ if pergunta:
                  for u, a in zip(st.session_state.mensagens[::2], st.session_state.mensagens[1::2])][-TURNOS_HISTORICO:]
     st.session_state.mensagens.append({"papel": "usuario", "texto": pergunta})
     with st.chat_message("user", avatar="🧑"):
-        st.markdown(texto_seguro(pergunta))
+        mostrar_pergunta(pergunta)
     with st.chat_message("assistant", avatar="⛽"):
+        st.markdown(MARCA_ANALISTA, unsafe_allow_html=True)    # já estiliza o quadro enquanto os agentes trabalham
         with st.status("Analisando a pergunta…", expanded=True) as status:
             def ao_etapa(etapa: str) -> None:
                 status.update(label=ETAPAS[etapa])
