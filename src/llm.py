@@ -71,7 +71,8 @@ def _obter_cliente() -> openai.OpenAI:
     global _cliente
     if _cliente is None:
         if not os.getenv("OPENAI_API_KEY"):
-            raise ErroLLM("OPENAI_API_KEY não encontrada no .env.")
+            raise ErroLLM("OPENAI_API_KEY não encontrada: no computador, coloque-a no .env; no Streamlit Cloud, "
+                          "em Settings → Secrets do app.")
         _cliente = openai.OpenAI(max_retries=3, timeout=180)   # o SDK repete sozinho em falhas temporárias
     return _cliente
 
