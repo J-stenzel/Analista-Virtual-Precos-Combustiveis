@@ -712,6 +712,8 @@ regras_de_negocio:
       dentro da janela recente (R06), distância pela métrica distancia_km <= raio, ordenar pelo preço (empate:
       menor distância), LIMIT = quantidade pedida (padrão 10). Mostrar razão social, endereço, número, bairro,
       distância (km, 1 casa), preço, data da coleta e raio_km.
+      "O posto MAIS PRÓXIMO" (sem pedir o mais barato; ajuste de 24/11): ordenar pela DISTÂNCIA (LIMIT 1, ou a
+      quantidade pedida), com o preço da ÚLTIMA coleta daquele produto no posto (R02) — mesmo raio automático.
     excecao: >
       Nenhum posto encontrado: com raio automático (nada até 5 km) -> dizer isso e PERGUNTAR se o usuário quer
       buscar num raio de até 10 km; com raio informado pelo usuário -> dizer isso e sugerir um raio maior.

@@ -144,6 +144,9 @@
     dos chips, faixa neutra, exemplos no centro, caixa de pergunta = altura do botão Localização) e 5.13g R15 com
     raio automático 3 → 5 km (numa só consulta, `raio_km`) e pergunta "até 10 km?" quando não acha (testado);
     5.13h link da fonte semanal da ANP ("últimas semanas pesquisadas") na barra lateral e no README.
+    ✅ (aprovado e commitado) 5.13i 1º exemplo = "preço mais recente da gasolina do posto mais
+    próximo a mim" + R15 "o mais próximo" ordena pela distância; cabeçalho fixo só em telas ≥ 900 px.
+    **Regra do aluno: nunca commitar sem ele dizer "pode commitar".**
   - ✅ 5.10/5.11 (24/11) **Registro das perguntas** na planilha Google do aluno (`src/registro.py`, gspread + conta de
     serviço `registro-perguntas`; credencial e link em `.streamlit/secrets.toml` — fora do Git; NUNCA ler/expor esse
     arquivo; testes só por script que não imprime segredos). Em segundo plano; reserva em `logs/perguntas.csv`.

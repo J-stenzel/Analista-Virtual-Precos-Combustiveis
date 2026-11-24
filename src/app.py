@@ -69,7 +69,7 @@ FUSO_BRASILIA = datetime.timezone(datetime.timedelta(hours=-3))   # o Brasil nã
 
 # Perguntas de exemplo (as da demo — nenhuma é do golden set)
 EXEMPLOS = [
-    "Quanto está o álcool em Floripa?",
+    "Qual é o preço mais recente da gasolina do posto mais próximo a mim?",   # R15 + R02 (precisa da localização)
     "Em Santa Catarina, posto sem bandeira é mais barato que posto de bandeira na gasolina?",
     "Qual o preço do GNV no Rio de Janeiro?",
     "Como variou mês a mês o preço médio da gasolina no Paraná em 2025?",
@@ -128,6 +128,11 @@ html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { fon
 .linha-info { display: flex; align-items: center; justify-content: space-between; gap: 24px;
     border-bottom: 1px solid #1B3440; padding-bottom: 12px; margin-bottom: 14px; }
 .linha-info > div:first-child { flex: 1; min-width: 0; }
+/* Cabeçalho FIXO ao rolar a conversa — só em telas largas (no celular ocuparia espaço demais e rola normalmente) */
+@media (min-width: 900px) {
+    [data-testid="stElementContainer"]:has(.topo) { position: sticky; top: 0; z-index: 50; background: #0D181D;
+        padding-top: 8px; box-shadow: 0 10px 18px -12px rgba(0,0,0,.65); }
+}
 @media (max-width: 900px) { .linha-info { flex-direction: column; align-items: flex-start; } }
 .topo > div:first-child { flex: 1; min-width: 0; }
 /* Título em UMA linha: tamanho acompanha a largura da tela; "Preços de Combustíveis" em degradê azul -> ciano

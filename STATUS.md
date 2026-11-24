@@ -200,6 +200,10 @@
   - ✅ 5.13g (aprovado e commitado) R15 com **raio automático**: sem raio -> 3 km; nada -> 5 km (mesma
     consulta, coluna raio_km); nada até 5 km -> avisa e pergunta se busca até 10 km. Testado com os 3 agentes:
     MASP (3 km), Cantareira B (ampliou p/ 5 km), Serra da Cantareira (0 → pergunta 10 km → "sim" → 10 postos)
+  - ✅ 5.13i (aprovado e commitado) 1º exemplo trocado por "Qual é o preço mais recente da gasolina do
+    posto mais próximo a mim?" + R15 ("o mais próximo" ordena pela distância, preço da última coleta — R02);
+    testado no app (Av. Paulista: José Maria Lisboa, 0,76 km, R$ 7,79 em 16/11 = SQL independente). Cabeçalho
+    FIXO só em telas ≥ 900 px (no celular rola normalmente) — testado em 1440 px e 375 px
   - ✅ 5.13h (aprovado e commitado) Fonte dos dados semanais ("Levantamento de Preços — últimas semanas
     pesquisadas", ANP) citada na barra lateral do app e no README, ao lado da Série Histórica
 
