@@ -232,6 +232,9 @@
     recente (R06), nunca a história toda (YAML: R06, sinônimos, checklist). Testado: Brooklin → R$ 5,99 em
     17/11/2026 (antes: R$ 4,269 de 2020). Golden set e dev não mudam (as perguntas deles têm período).
   - 💡 Limite visto: bairro/“região” depende do nome escrito na base (BROOKLIN × BROOKLIN PAULISTA)
+- ✅ 7.2 Teclado do celular fecha ao enviar a pergunta (blur na caixa só em tela de toque — Android e iPhone;
+  no notebook o foco fica). Testado na simulação de celular (TEXTAREA → BODY) e no notebook (foco mantido);
+  ⚠️ falta o aluno confirmar num iPhone/Android de verdade (a simulação não tem teclado virtual)
 - ⬜ Demo ao vivo (com perguntas de reserva)
 - ⬜ Todos os membros sabem explicar qualquer parte do projeto
 

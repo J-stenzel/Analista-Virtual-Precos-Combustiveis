@@ -308,10 +308,20 @@ def rolar_ate_ultima_mensagem() -> None:
     """Rola a conversa até o INÍCIO da última mensagem (pergunta recém-enviada ou resposta recém-chegada).
     Sem isso, no celular a tela fica parada e a pessoa não vê a resposta nem um pedido de esclarecimento.
     Script mínimo num iframe invisível: só rola a página (não lê nem altera dados). O comentário com um número
-    novo a cada chamada faz o Streamlit executar o script de novo."""
+    novo a cada chamada faz o Streamlit executar o script de novo.
+    Em tela de TOQUE (celular, Android ou iPhone) também fecha o teclado: tira o foco da caixa de texto (blur), que o
+    sistema permite — abrir o teclado sozinho não é permitido, fechar é. Rola só depois que o teclado fecha (no
+    iPhone a área visível muda de tamanho). No notebook o foco fica na caixa, para a próxima pergunta."""
     components.html(f"""<!-- {uuid.uuid4().hex} --><script>
+      const doc = window.parent.document;
+      const toque = window.parent.matchMedia('(pointer: coarse)').matches;
+      function fecharTeclado() {{
+        const ativo = doc.activeElement;
+        if (toque && ativo && ativo.tagName === 'TEXTAREA') ativo.blur();
+      }}
+      setTimeout(fecharTeclado, 50);
+      setTimeout(fecharTeclado, 300);          // de novo, caso o Streamlit devolva o foco à caixa depois do envio
       setTimeout(function () {{
-        const doc = window.parent.document;
         const msgs = doc.querySelectorAll('[data-testid="stChatMessage"]');
         const area = doc.querySelector('[data-testid="stMain"]');
         if (!msgs.length || !area) return;
@@ -321,7 +331,7 @@ def rolar_ate_ultima_mensagem() -> None:
         const folga = cab ? cab.closest('[data-testid="stElementContainer"]').offsetHeight + 16 : 12;
         area.scrollBy({{top: alvo.getBoundingClientRect().top - area.getBoundingClientRect().top - folga,
                         behavior: 'smooth'}});
-      }}, 350);
+      }}, toque ? 550 : 350);                  // no celular, espera o teclado fechar antes de rolar
     </script>""", height=0)
 
 
