@@ -119,6 +119,10 @@
     `.msg-analista` + CSS `:has()`); LinkedIn no chip do professor e no nome do Jeferson (aparência igual).
     Título do professor: **Prof. Dr.** (decisão do aluno, 23/11 — o LinkedIn mostra PhD).
     Ordem da resposta: texto → gráfico → tabela (+ CSV) → SQL. Bug do gráfico de barras corrigido (pandas 3: texto = "str").
+  - ✅ 5.9 (24/11) Limite: 20 perguntas/sessão + 500/dia no app (`@st.cache_resource` + Lock; F5/"Nova conversa" não
+    zeram; caixa de texto desenhada no FIM do script via `on_submit`). Seletor de modelos v5 **descartado** (2× mais caro).
+  - ⬜ 5.10 Registro das perguntas em CSV (IP, navegador/sistema, fuso, idioma, nome opcional; **sem** nome da máquina
+    e **sem** geolocalização). ⬜ 5.11 Planilha Google — mais à frente (aluno cria a conta de serviço).
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
     explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
   Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).

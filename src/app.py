@@ -10,8 +10,10 @@ um gráfico automático quando faz sentido (feito pelo código, sem LLM) e o tem
 Visual: identidade inspirada no site da Faculdade Impacta (fundo escuro, azul #116FFF, ciano #00D8FF, Montserrat).
 """
 import base64
+import datetime
 import os
 import sys
+import threading
 from pathlib import Path
 
 import altair as alt
@@ -52,6 +54,10 @@ LOGO_IMPACTA = RAIZ / "assets" / "logo_impacta.png"
 LOGO_ANP = RAIZ / "assets" / "logo_anp.png"
 MAX_CARACTERES = 500          # guardrail: evita perguntas enormes (custo)
 TURNOS_HISTORICO = 4          # quantos turnos anteriores vão para o Orquestrador
+# Limites de uso (protegem os créditos da OpenAI; podem ser trocados nos Secrets/.env sem mexer no código)
+LIMITE_SESSAO = int(os.getenv("LIMITE_SESSAO", "20"))   # perguntas por sessão do navegador
+LIMITE_DIA = int(os.getenv("LIMITE_DIA", "500"))        # perguntas por dia no app inteiro (todos os visitantes)
+FUSO_BRASILIA = datetime.timezone(datetime.timedelta(hours=-3))   # o Brasil não tem mais horário de verão
 
 # Perguntas de exemplo (as da demo — nenhuma é do golden set)
 EXEMPLOS = [
@@ -241,12 +247,60 @@ def mostrar_resposta(res: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Limite de perguntas: por sessão (st.session_state) + por dia no app inteiro (st.cache_resource)
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def contador_do_dia() -> dict:
+    """Contador COMPARTILHADO por todas as sessões: o cache_resource é um único objeto no processo do app.
+    Zera na virada do dia (horário de Brasília) e quando o app reinicia."""
+    return {"data": None, "total": 0, "trava": threading.Lock()}
+
+
+def perguntas_hoje() -> int:
+    c = contador_do_dia()
+    with c["trava"]:
+        return c["total"] if c["data"] == datetime.datetime.now(FUSO_BRASILIA).date() else 0
+
+
+def reservar_pergunta() -> str | None:
+    """Conta a pergunta ANTES de chamar a LLM (é ali que se gasta). Devolve None se pode seguir,
+    ou a mensagem de bloqueio."""
+    if st.session_state.perguntas_feitas >= LIMITE_SESSAO:
+        return (f"Você usou as {LIMITE_SESSAO} perguntas desta sessão. Obrigado por testar o analista virtual! "
+                "Esse limite protege os créditos do projeto acadêmico.")
+    c = contador_do_dia()
+    hoje = datetime.datetime.now(FUSO_BRASILIA).date()
+    with c["trava"]:                     # duas pessoas perguntando no mesmo instante não "furam" o limite
+        if c["data"] != hoje:
+            c["data"], c["total"] = hoje, 0
+        if c["total"] >= LIMITE_DIA:
+            return f"O limite diário de {LIMITE_DIA} perguntas do app foi atingido. Volte amanhã!"
+        c["total"] += 1
+    st.session_state.perguntas_feitas += 1
+    return None
+
+
+def devolver_pergunta() -> None:
+    """A OpenAI deu erro e não houve resposta: a pergunta não conta."""
+    c = contador_do_dia()
+    with c["trava"]:
+        c["total"] = max(0, c["total"] - 1)
+    st.session_state.perguntas_feitas = max(0, st.session_state.perguntas_feitas - 1)
+
+
+def texto_restantes() -> str:
+    restam = max(0, LIMITE_SESSAO - st.session_state.perguntas_feitas)
+    return f'<div class="lateral-texto">{restam} de {LIMITE_SESSAO} nesta sessão</div>'
+
+
+# ---------------------------------------------------------------------------
 # Estado da sessão
 # ---------------------------------------------------------------------------
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = []          # [{"papel": "usuario"/"assistente", "texto": str, "res": dict}]
     st.session_state.custo_sessao = 0.0
     st.session_state.pendente = None         # pergunta vinda de um botão de exemplo
+st.session_state.setdefault("perguntas_feitas", 0)   # NÃO zera no "Nova conversa" (senão furaria o limite)
 
 # ---------------------------------------------------------------------------
 # Barra lateral
@@ -274,8 +328,11 @@ with st.sidebar:
     gasto_sessao = st.empty()      # atualizado no lugar depois de cada resposta (sem recarregar a página)
     gasto_sessao.markdown(f'<div class="lateral-texto">US$ {st.session_state.custo_sessao:.4f}</div>',
                           unsafe_allow_html=True)
+    st.markdown('<div class="lateral-titulo">Perguntas restantes</div>', unsafe_allow_html=True)
+    restantes = st.empty()
+    restantes.markdown(texto_restantes(), unsafe_allow_html=True)
     st.write("")
-    if st.button("🗑️ Nova conversa", use_container_width=True):
+    if st.button("🗑️ Nova conversa", use_container_width=True):   # limpa a conversa, mas não o limite
         st.session_state.mensagens, st.session_state.custo_sessao, st.session_state.pendente = [], 0.0, None
         st.rerun()
 
@@ -340,10 +397,16 @@ for msg in st.session_state.mensagens:
         else:
             mostrar_resposta(msg["res"])
 
-digitada = st.chat_input("Pergunte sobre preços de combustíveis… (ex.: quanto está o diesel em Curitiba?)",
-                         max_chars=MAX_CARACTERES)
-pergunta = digitada or st.session_state.pendente
+# A pergunta chega pelo botão de exemplo ou pela caixa de texto (callback ao_enviar, abaixo).
+# A caixa é desenhada no FIM do script: assim ela já aparece desabilitada logo depois da última pergunta permitida.
+pergunta = st.session_state.pendente
 st.session_state.pendente = None
+bloqueio = reservar_pergunta() if pergunta else None
+if bloqueio:
+    st.warning(f"🚦 {bloqueio}")
+    pergunta = None
+elif pergunta:
+    restantes.markdown(texto_restantes(), unsafe_allow_html=True)   # o contador já desconta esta pergunta
 
 if pergunta:
     historico = [{"pergunta": u["texto"], "resposta": a["res"]["resposta"]}
@@ -357,6 +420,7 @@ if pergunta:
             def ao_etapa(etapa: str) -> None:
                 status.update(label=ETAPAS[etapa])
                 st.write(ETAPAS[etapa])
+            res = None
             try:
                 res = orchestrator.responder(pergunta, historico, ao_etapa=ao_etapa)
                 rotulo = CLASSES.get(res["classe"], ("", "", "Pronto"))[2]
@@ -364,11 +428,30 @@ if pergunta:
             except llm.ErroLLM as erro:
                 status.update(label="Não foi possível responder", state="error")
                 st.session_state.mensagens.pop()        # tira a pergunta sem resposta do histórico
+                devolver_pergunta()                     # e ela não conta no limite
                 st.error(f"⚠️ {erro}")
-                st.stop()
-        mostrar_resposta(res)
-    st.session_state.mensagens.append({"papel": "assistente", "texto": res["resposta"], "res": res})
-    st.session_state.custo_sessao += res["uso"]["custo_usd"]
-    # Atualiza só o gasto na barra lateral (um st.rerun() levaria a página de volta ao topo da conversa)
+        if res:
+            mostrar_resposta(res)
+    if res:
+        st.session_state.mensagens.append({"papel": "assistente", "texto": res["resposta"], "res": res})
+        st.session_state.custo_sessao += res["uso"]["custo_usd"]
+    # Atualiza só o gasto e o contador na barra lateral (um st.rerun() levaria a página de volta ao topo da conversa)
     gasto_sessao.markdown(f'<div class="lateral-texto">US$ {st.session_state.custo_sessao:.4f}</div>',
                           unsafe_allow_html=True)
+    restantes.markdown(texto_restantes(), unsafe_allow_html=True)
+
+
+def ao_enviar() -> None:
+    """Callback da caixa de texto: roda ANTES da próxima execução do script e guarda a pergunta digitada."""
+    st.session_state.pendente = st.session_state.get("entrada")
+
+
+fim_sessao = st.session_state.perguntas_feitas >= LIMITE_SESSAO
+fim_dia = perguntas_hoje() >= LIMITE_DIA
+esgotado = fim_sessao or fim_dia
+if esgotado and not bloqueio:
+    st.info(f"🚦 Você usou as {LIMITE_SESSAO} perguntas desta sessão. Obrigado por testar o analista virtual!"
+            if fim_sessao else f"🚦 O limite diário de {LIMITE_DIA} perguntas do app foi atingido. Volte amanhã!")
+st.chat_input("Limite de perguntas atingido." if esgotado else
+              "Pergunte sobre preços de combustíveis… (ex.: quanto está o diesel em Curitiba?)",
+              max_chars=MAX_CARACTERES, disabled=esgotado, key="entrada", on_submit=ao_enviar)

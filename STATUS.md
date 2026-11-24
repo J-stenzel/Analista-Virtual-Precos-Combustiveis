@@ -155,6 +155,14 @@
   - ✅ Ordem da resposta: texto → gráfico → tabela (+ CSV) → SQL (pedido do aluno)
   - ✅ Bug corrigido: gráfico de BARRAS nunca aparecia (pandas 3 usa o tipo "str" para texto, não "object");
     testado com o ranking de 5 estados (etanol)
+- ✅ 5.8 Seletor de modelos — **descartado** pelo aluno (24/11): a versão 5 (gpt-5.6-terra/sol/luna) custa 2× mais
+  e não foi avaliada; ficam só os modelos atuais
+- ✅ 5.9 Limite de uso: 20 perguntas por sessão + 500 por dia no app inteiro (contador compartilhado com trava;
+  F5 e "Nova conversa" não zeram; pergunta devolvida se a OpenAI falhar; caixa desabilitada ao atingir).
+  Testado numa cópia com limites 1 (sessão e dia). `LIMITE_SESSAO`/`LIMITE_DIA` no `.env.example` e README
+- ⬜ 5.10 Registro das perguntas: data, sessão, IP, navegador/sistema, fuso, idioma, nome opcional, pergunta,
+  tipo, custo (SEM nome da máquina e SEM geolocalização — decisão do aluno). CSV local agora
+- ⬜ 5.11 Planilha Google (conta de serviço) — mais à frente, com tutorial para o aluno
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação

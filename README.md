@@ -196,6 +196,9 @@ O SQL gerado pela LLM é tratado como **entrada não confiável** (equivalente a
 7. **Auditoria** dos SQL bloqueados em `logs/sql_bloqueado.log`.
 8. Perguntas fora do escopo e pedidos de alteração/segredos são **recusados com educação**.
 9. O **SQL usado aparece sempre** para o usuário; a chave de API fica só no `.env`.
+10. **Limite de uso no app** — 20 perguntas por sessão do navegador e 500 por dia no app inteiro (contador
+    compartilhado, que o F5 não zera); a pergunta conta antes de chamar a LLM e é devolvida se a OpenAI falhar.
+    Ajustável por `LIMITE_SESSAO` e `LIMITE_DIA` no `.env`/Secrets.
 
 `tests/testar_tools.py` verifica 55 casos, incluindo 27 ataques e consultas proibidas bloqueados e a conexão recusando
 ataques sozinha (sem depender do validador).
@@ -279,10 +282,11 @@ custaram menos de US$ 8. Cada chamada é registrada em `logs/uso_llm.csv`.
 - Preços fora do padrão não são removidos nem marcados (decisão do grupo): o usuário avalia.
 - Respostas com dados levam em média ~20 s (às vezes mais, conforme a latência da API).
 - A acurácia medida (90–95%) tem incerteza de ±1–2 perguntas por rodada, por ser um sistema não determinístico.
-- O app online não tem controle de acesso: qualquer pessoa com o link usa os créditos da chave configurada
-  (o limite de gastos fica no painel da OpenAI).
+- O app online não tem login: qualquer pessoa com o link usa os créditos da chave configurada, dentro do
+  limite de 20 perguntas por sessão e 500 por dia (o contador diário zera se o app reiniciar; o limite de gastos
+  definitivo fica no painel da OpenAI).
 
-**Projetos futuros:** senha de acesso e limite de perguntas por sessão no app online; login de usuários;
+**Projetos futuros:** senha de acesso e login de usuários no app online;
 cache de respostas repetidas; melhorar o texto do Analista quando a tabela tem mais de 20 linhas.
 
 ## 11. Uso de IA no desenvolvimento
