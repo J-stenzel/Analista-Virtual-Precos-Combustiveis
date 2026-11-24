@@ -179,6 +179,8 @@ def ler_semanal(con: duckdb.DuckDBPyConnection) -> dict:
         "Municipio": s["MUNICÍPIO"],
         "Revenda": s["RAZÃO"],
         "CNPJ da Revenda": cnpj,
+        "Nome da Rua": s["ENDEREÇO"],
+        "Numero Rua": s["NÚMERO"],
         "Bairro": s["BAIRRO"],
         # mesmo formato da base (00000-000); CEP vazio ou "0" fica nulo (não inventa um CEP 00000-000)
         "Cep": (cep.str[:5] + "-" + cep.str[5:]).where(cep.str.strip("0") != "", None),
@@ -212,6 +214,8 @@ def limpar(con: duckdb.DuckDBPyConnection) -> None:
                 UPPER(TRIM("Municipio"))                              AS municipio,
                 UPPER(TRIM("Revenda"))                                AS razao_social,
                 regexp_replace("CNPJ da Revenda", '[^0-9]', '', 'g')  AS cnpj,        -- só dígitos
+                UPPER(TRIM("Nome da Rua"))                            AS endereco,    -- p/ geocodificar
+                UPPER(TRIM("Numero Rua"))                             AS numero,
                 UPPER(TRIM("Bairro"))                                 AS bairro,
                 TRIM("Cep")                                           AS cep,
                 UPPER(TRIM("Produto"))                                AS produto,
@@ -219,7 +223,8 @@ def limpar(con: duckdb.DuckDBPyConnection) -> None:
                 CAST(REPLACE(TRIM("Valor de Venda"), ',', '.') AS DECIMAL(10,3)) AS valor_venda,
                 REPLACE(TRIM("Unidade de Medida"), 'm3', 'm³')        AS unidade,     -- padroniza GNV
                 UPPER(TRIM("Bandeira"))                               AS bandeira_original
-                -- "Valor de Compra" e endereço detalhado foram descartados de propósito
+                -- "Valor de Compra" e "Complemento" foram descartados de propósito.
+                -- Rua e número voltaram em 24/11 (antes descartados) para geocodificar os postos (5.13).
             FROM stg_bruto
             WHERE "Produto" IS NOT NULL AND TRIM("Produto") <> ''     -- remove linhas vazias
         )
@@ -239,6 +244,8 @@ def limpar(con: duckdb.DuckDBPyConnection) -> None:
             ANY_VALUE(uf)                 AS uf,
             ANY_VALUE(municipio)          AS municipio,
             ANY_VALUE(razao_social)       AS razao_social,
+            ANY_VALUE(endereco)           AS endereco,
+            ANY_VALUE(numero)             AS numero,
             ANY_VALUE(bairro)             AS bairro,
             ANY_VALUE(cep)                AS cep,
             ANY_VALUE(unidade)            AS unidade,
@@ -311,6 +318,8 @@ def criar_dimensoes(con: duckdb.DuckDBPyConnection) -> None:
         CREATE OR REPLACE TABLE dim_posto AS
         SELECT cnpj,
                arg_max(razao_social, data_coleta) AS razao_social,
+               arg_max(endereco, data_coleta)     AS endereco,
+               arg_max(numero, data_coleta)       AS numero,
                arg_max(bairro, data_coleta)       AS bairro,
                arg_max(cep, data_coleta)          AS cep,
                MIN(data_coleta)                   AS primeira_coleta,
@@ -353,6 +362,8 @@ TESTES = [
      "SELECT COUNT(*) FROM stg_bruto WHERE \"Produto\" IS NULL OR TRIM(\"Produto\") = ''"),
     ("Registros de origem agregados por duplicidade (informativo)", "INFO",
      "SELECT COALESCE(SUM(qtd_registros_origem - 1), 0) FROM fato_precos"),
+    ("Postos sem rua no cadastro (informativo; não serão geocodificados pelo endereço)", "INFO",
+     "SELECT COUNT(*) FROM dim_posto WHERE endereco IS NULL OR endereco = ''"),
     ("Nulos em colunas-chave da fato", "CRITICO",
      """SELECT COUNT(*) FROM fato_precos
         WHERE data IS NULL OR cnpj IS NULL OR id_local IS NULL OR id_produto IS NULL

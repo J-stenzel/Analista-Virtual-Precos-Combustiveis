@@ -125,6 +125,14 @@
     converte o .xlsx para as colunas do CSV). 17 testes de qualidade ✅; histórico até 30/06 idêntico (0 diferenças);
     camada semântica, tools e golden set ✅; app conferido (etanol Floripa R$ 4,662, 15 postos, nov/2026 = SQL
     independente). YAML/README/app atualizados para 21/11/2026. `openpyxl` no requirements; `.xlsx` no `.gitignore`.
+  - 🔄 5.13 **Postos próximos (complemento, fora da entrega de validação)** — decisões do aluno (24/11): só **SP**
+    primeiro (1.978 postos ativos ≈ 20% da cota grátis de 10 mil/mês); **Google Geocoding** (chave
+    `GOOGLE_MAPS_API_KEY` no `.env`/Secrets, projeto Google separado, restrita à Geocoding API, limite diário +
+    alerta de orçamento); coordenadas na `dim_posto` + `geocodificado_em` (termos do Google: apagar/refazer em 30
+    dias — aluno fará a exclusão); raio vem da pergunta (sem raio → perguntar, sugerir 3 km); botão de localização
+    do navegador + CEP; registro guarda coordenada arredondada (2 casas) ou o CEP digitado.
+    ✅ 5.13a rua + número na `dim_posto` (fato idêntica; testes ✅). ⬜ 5.13b script de geocodificação (aguarda a
+    chave do aluno) ⬜ 5.13c YAML (distância/R15) ⬜ 5.13d app.
   - ⬜ 5.10 Registro das perguntas em CSV (IP, navegador/sistema, fuso, idioma, nome opcional; **sem** nome da máquina
     e **sem** geolocalização). ⬜ 5.11 Planilha Google — mais à frente (aluno cria a conta de serviço).
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
@@ -176,7 +184,8 @@ Fluxo: Pergunta → entendimento/contexto → gerar e validar SQL → executar �
   datas ≤ 30/06 descartadas (as 11.472 de 29–30/06 batem 100% com o CSV). `load_data.py --sem-semanal` recria a base
   até 30/06/2026 (a do golden set). Dado bruto nunca é editado à mão: a limpeza fica no código.
   LaDe e Ola foram consideradas e descartadas.
-- "Valor de Compra" **descartada** (só existia até ago/2020). Endereço detalhado descartado (fica bairro e CEP).
+- "Valor de Compra" **descartada** (só existia até ago/2020). Endereço: até 23/11 só bairro e CEP; desde 24/11
+  a `dim_posto` tem também **rua (`endereco`) e `numero`** (para geocodificar os postos — 5.13). Complemento descartado.
 - **Banco:** DuckDB (colunar, rápido para agregações, um arquivo só). Staging feito em memória (arquivo final ~40 MB).
 - **Bandeiras padronizadas:** PETROBRAS DISTRIBUIDORA S.A./VIBRA ENERGIA → VIBRA; ALESAT → ALE; FEDERAL → FEDERAL ENERGIA;
   TOTAL BRASIL → TOTALENERGIES. Bandeira e local ficam na FATO (podem mudar ao longo do tempo para o mesmo posto).

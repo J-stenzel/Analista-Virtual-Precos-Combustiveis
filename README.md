@@ -164,7 +164,7 @@ Modelo **estrela** em DuckDB (`src/load_data.py`):
 | `dim_local` | 471 | região → UF → município |
 | `dim_produto` | 6 | gasolina, gasolina aditivada, etanol, diesel, diesel S10, GNV (+ unidade) |
 | `dim_bandeira` | 77 | bandeira padronizada (ex.: Petrobras/Vibra → VIBRA) + flag bandeira branca |
-| `dim_posto` | 21.184 | CNPJ, razão social, bairro, CEP, 1ª e última coleta |
+| `dim_posto` | 21.184 | CNPJ, razão social, rua, número, bairro, CEP, 1ª e última coleta |
 
 **Relatórios semanais:** o Excel da ANP tem o cabeçalho na linha 10 e formato diferente do CSV. O `load_data.py`
 converte para o mesmo padrão (CNPJ com 14 dígitos e CEP `00000-000` — o Excel guarda como número e perde os zeros;

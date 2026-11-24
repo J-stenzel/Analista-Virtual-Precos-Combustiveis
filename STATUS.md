@@ -171,6 +171,13 @@
     novas; base 01/01/2020 a 21/11/2026 (5.809.204 linhas); histórico até 30/06 idêntico
   - ✅ Testes: qualidade (17), camada semântica, tools, golden set; app conferido com SQL independente
   - ✅ YAML, README, app e `docs/qualidade_dados.md` atualizados; `openpyxl` no requirements
+- 🔄 5.13 Postos próximos ao usuário (complemento — fora da entrega de validação; só SP primeiro; Google Geocoding)
+  - ✅ Cota conferida: 1.978 postos ativos de SP ≈ 20% das 10 mil consultas grátis/mês (limite do aluno: 50%)
+  - ✅ Tutorial da chave: projeto separado, restrição à Geocoding API, limite diário, alerta de orçamento, Secrets
+  - ✅ 5.13a Rua e número na `dim_posto` (antes descartados); fato idêntica; todos os testes ✅
+  - ⬜ 5.13b `geocodificar_postos.py` (aguarda `GOOGLE_MAPS_API_KEY` do aluno) + colunas de geocode na `dim_posto`
+  - ⬜ 5.13c YAML: `distancia_km` (haversine) + R15 (raio da pergunta; sem raio → perguntar, sugerir 3 km)
+  - ⬜ 5.13d App: botão "📍 Usar minha localização" + CEP + pergunta de exemplo + aviso de privacidade
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação

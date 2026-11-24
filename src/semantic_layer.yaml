@@ -100,6 +100,8 @@ tabelas:
     colunas:
       cnpj: "CNPJ do posto, só dígitos (14 caracteres)."
       razao_social: "Nome (razão social) do posto, em maiúsculas."
+      endereco: "Rua/avenida do posto, em MAIÚSCULAS (ex.: 'AVENIDA COPACABANA'). Mostrar ao listar postos."
+      numero: "Número do endereço, como texto (pode ser 'S/N' ou 'KM 98')."
       bairro: "Bairro do posto (pode ter acento)."
       cep: "CEP no formato '00000-000'."
       primeira_coleta: "Primeira data em que o posto aparece na pesquisa."

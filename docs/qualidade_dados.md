@@ -1,6 +1,6 @@
 # Relatório de qualidade dos dados
 
-Gerado por `src/load_data.py` em 24/11/2026 11:25.
+Gerado por `src/load_data.py` em 24/11/2026 12:15.
 
 Período da base: 01/01/2020 a 21/11/2026.
 
@@ -29,6 +29,7 @@ Período da base: 01/01/2020 a 21/11/2026.
 |---|---|---:|---|
 | Linhas vazias removidas (informativo) | INFO | 9.114 | ℹ️ |
 | Registros de origem agregados por duplicidade (informativo) | INFO | 20 | ℹ️ |
+| Postos sem rua no cadastro (informativo; não serão geocodificados pelo endereço) | INFO | 0 | ℹ️ |
 | Nulos em colunas-chave da fato | CRITICO | 0 | ✅ |
 | Duplicatas no grão (data, cnpj, produto) | CRITICO | 0 | ✅ |
 | CNPJ com tamanho diferente de 14 dígitos | CRITICO | 0 | ✅ |
