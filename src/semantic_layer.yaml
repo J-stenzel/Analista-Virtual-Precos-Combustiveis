@@ -704,15 +704,19 @@ regras_de_negocio:
     regra: >
       "Postos perto de mim / mais próximos / num raio de X km" (complemento de 24/11, só SP por enquanto):
       precisa da LOCALIZAÇÃO DO USUÁRIO, que o app entrega ao Agente SQL como dado (lat/lon) — nunca inventar
-      nem estimar a localização. O RAIO vem da pergunta ("3 km", "até 5 km"); sem raio informado -> ESCLARECIMENTO
-      perguntando a distância (sugerir 3 km). Sem localização -> ESCLARECIMENTO pedindo para clicar em
-      "📍 Usar minha localização" ou informar o CEP. Consulta: só postos com coordenada (p.latitude IS NOT NULL),
-      última coleta DAQUELE produto de cada posto dentro da janela recente (R06), distância pela métrica
-      distancia_km <= raio, ordenar pelo preço (empate: menor distância), LIMIT = quantidade pedida (padrão 10).
-      Mostrar razão social, endereço, número, bairro, distância (km, 1 casa), preço e data da coleta.
+      nem estimar a localização. RAIO: se o usuário informar ("2 km", "até 10 km"), vale o dele. Se NÃO informar
+      (ajuste do aluno, 24/11): RAIO AUTOMÁTICO — 3 km; se não houver nenhum posto até 3 km, 5 km — numa ÚNICA
+      consulta (ver exemplo_raio_automatico), com a coluna raio_km dizendo qual raio foi usado.
+      Sem localização -> ESCLARECIMENTO pedindo para clicar em "📍 Localização" (botão do navegador ou CEP).
+      Consulta: só postos com coordenada (p.latitude IS NOT NULL), última coleta DAQUELE produto de cada posto
+      dentro da janela recente (R06), distância pela métrica distancia_km <= raio, ordenar pelo preço (empate:
+      menor distância), LIMIT = quantidade pedida (padrão 10). Mostrar razão social, endereço, número, bairro,
+      distância (km, 1 casa), preço, data da coleta e raio_km.
     excecao: >
-      Nenhum posto no raio -> dizer isso e sugerir um raio maior (não ampliar sozinho). A distância é em LINHA RETA
-      (não é o trajeto de carro) e só cobre postos da AMOSTRA da ANP em SP com coordenada.
+      Nenhum posto encontrado: com raio automático (nada até 5 km) -> dizer isso e PERGUNTAR se o usuário quer
+      buscar num raio de até 10 km; com raio informado pelo usuário -> dizer isso e sugerir um raio maior.
+      Nunca ampliar além de 5 km sem o usuário pedir. A distância é em LINHA RETA (não é o trajeto de carro) e só
+      cobre postos da AMOSTRA da ANP em SP com coordenada.
     exemplo:
       pergunta: "Liste os 10 postos mais próximos de mim com a gasolina mais barata num raio de 3 km"
       localizacao_teste: "lat -23.5614, lon -46.6559 (Av. Paulista, 1578 — MASP)"
@@ -744,6 +748,42 @@ regras_de_negocio:
         WHERE distancia_km <= 3
         ORDER BY valor_venda, distancia_km
         LIMIT 10
+    exemplo_raio_automatico:
+      pergunta: "Onde está o etanol mais barato perto de mim?"   # sem raio -> 3 km; nada até 3 km -> 5 km
+      localizacao_teste: "lat -23.5614, lon -46.6559 (Av. Paulista, 1578 — MASP)"
+      sql: |
+        WITH janela AS (
+          SELECT CAST(date_trunc('month', MAX(data)) - INTERVAL 2 MONTH AS DATE) AS inicio, MAX(data) AS fim
+          FROM fato_precos
+        ),
+        ultima AS (
+          SELECT f.cnpj, f.data, f.valor_venda
+          FROM fato_precos f
+          JOIN dim_produto pr ON pr.id_produto = f.id_produto
+          JOIN janela         ON f.data BETWEEN janela.inicio AND janela.fim
+          WHERE pr.produto = 'ETANOL'
+          QUALIFY ROW_NUMBER() OVER (PARTITION BY f.cnpj ORDER BY f.data DESC) = 1
+        ),
+        perto AS (
+          SELECT p.razao_social, p.endereco, p.numero, p.bairro, u.valor_venda, u.data AS data_coleta,
+                 2 * 6371 * ASIN(SQRT(POWER(SIN(RADIANS(p.latitude - (-23.5614)) / 2), 2)
+                   + COS(RADIANS(-23.5614)) * COS(RADIANS(p.latitude))
+                   * POWER(SIN(RADIANS(p.longitude - (-46.6559)) / 2), 2))) AS distancia_km
+          FROM ultima u
+          JOIN dim_posto p ON p.cnpj = u.cnpj
+          WHERE p.latitude IS NOT NULL
+        ),
+        raio AS (   -- raio automático: 3 km; se não houver posto até 3 km, 5 km; nenhum até 5 km -> NULL (0 linhas)
+          SELECT CASE WHEN COUNT(*) FILTER (WHERE distancia_km <= 3) > 0 THEN 3
+                      WHEN COUNT(*) FILTER (WHERE distancia_km <= 5) > 0 THEN 5 END AS raio_km
+          FROM perto
+        )
+        SELECT razao_social, endereco, numero, bairro, ROUND(distancia_km, 1) AS distancia_km,
+               valor_venda, data_coleta, raio.raio_km
+        FROM perto CROSS JOIN raio
+        WHERE distancia_km <= raio.raio_km
+        ORDER BY valor_venda, distancia_km
+        LIMIT 10
 
 # Checklist que o Agente SQL confere ANTES de executar:
 checklist_sql:
@@ -757,8 +797,8 @@ checklist_sql:
   - "O usuário comparou opções que ELE citou (ex.: 'Shell, BR ou Ipiranga', 'etanol ou gasolina')? Traga TODAS,
      cada uma com o seu valor, ordenadas — sem LIMIT 1 (quem aponta a vencedora é a resposta). (Correção de 23/11.)"
   - "A última consulta executada com sucesso é a resposta COMPLETA? (nada de paginar com OFFSET)"
-  - "Postos próximos: usou a LOCALIZAÇÃO DO USUÁRIO recebida (nunca inventada), o raio da pergunta,
-     p.latitude IS NOT NULL e a métrica distancia_km? (R15)"
+  - "Postos próximos: usou a LOCALIZAÇÃO DO USUÁRIO recebida (nunca inventada), p.latitude IS NOT NULL e a métrica
+     distancia_km? Raio: o do usuário; sem raio -> automático 3 km -> 5 km numa só consulta, com a coluna raio_km (R15)"
 
 # Ressalvas que o Agente Analista acrescenta à resposta quando se aplicam:
 ressalvas:
@@ -769,3 +809,7 @@ ressalvas:
   amostra_pequena: "Poucos postos no recorte (< 5): a média pode não representar o local (avisar, não recusar)."
   amostra_muda: "Em comparações entre períodos, os postos pesquisados podem não ser os mesmos."
   distancia: "Distância em linha reta (não é o trajeto); só postos da amostra da ANP em SP com localização (R15)."
+  raio_ampliado: "Não havia posto até 3 km: a busca foi ampliada automaticamente para 5 km (R15). Diga isso."
+  sem_postos_no_raio: >
+    Nenhum posto encontrado no raio pesquisado (R15). Se o raio foi automático (até 5 km), diga isso e PERGUNTE se o
+    usuário quer buscar num raio de até 10 km. Se o usuário informou o raio, diga isso e sugira um raio maior.

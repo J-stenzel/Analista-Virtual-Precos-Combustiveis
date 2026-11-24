@@ -35,6 +35,8 @@ sys.path.insert(0, str(RAIZ / "src"))
 import llm           # noqa: E402
 import orchestrator  # noqa: E402
 import geo           # noqa: E402  (CEP -> coordenada, complemento 5.13)
+import registro      # noqa: E402  (registro das perguntas na planilha Google, 5.10/5.11)
+import uuid          # noqa: E402
 from streamlit_js_eval import get_geolocation  # noqa: E402  (localização do navegador, com permissão do usuário)
 
 # ---------------------------------------------------------------------------
@@ -53,6 +55,9 @@ DESENVOLVEDORES = [("Jeferson Stenzel", "https://www.linkedin.com/in/jeferson-st
                    ("Leonardo M. L. Rodrigues", None),
                    ("Leonardo M. Lima", None)]
 FONTE_URL = "https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis"
+# Relatórios SEMANAIS mais recentes (data/raw_semanal) — complementam a série histórica a partir de jul/2026
+FONTE_SEMANAL_URL = ("https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/"
+                     "levantamento-de-precos-de-combustiveis-ultimas-semanas-pesquisadas")
 LOGO_IMPACTA = RAIZ / "assets" / "logo_impacta.png"
 LOGO_ANP = RAIZ / "assets" / "logo_anp.png"
 MAX_CARACTERES = 500          # guardrail: evita perguntas enormes (custo)
@@ -97,7 +102,7 @@ st.markdown("""
 html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { font-family: 'Montserrat', sans-serif !important; }
 
 /* Topo: espaço para o cabeçalho; barra do Streamlit transparente e sem "Deploy" */
-.block-container { padding-top: 3.8rem; max-width: 1200px; }
+.block-container { padding-top: 3.8rem; max-width: 1480px; }   /* área central mais larga */
 [data-testid="stHeader"] { background: transparent; }
 .stAppDeployButton, [data-testid="stAppDeployButton"] { display: none; }
 
@@ -116,13 +121,27 @@ html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { fon
 .lateral-devs { font-size: 0.95rem; line-height: 1.5; }   /* nomes do grupo um pouco maiores */
 
 /* Cabeçalho */
-.topo { display: flex; align-items: center; justify-content: space-between; gap: 24px;
-    border-bottom: 1px solid #1B3440; padding-bottom: 14px; margin-bottom: 12px; }
+.topo { display: block; margin-bottom: 2px; }                     /* título sozinho, largura inteira */
+.topo > div:first-child { width: 100%; }
+.linha-info { display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    border-bottom: 1px solid #1B3440; padding-bottom: 12px; margin-bottom: 14px; }
+.linha-info > div:first-child { flex: 1; min-width: 0; }
+@media (max-width: 900px) { .linha-info { flex-direction: column; align-items: flex-start; } }
 .topo > div:first-child { flex: 1; min-width: 0; }
-.titulo { color: #FFFFFF; font-size: 1.9rem; font-weight: 900; line-height: 1.12; text-transform: uppercase; letter-spacing: .5px; }
-@media (max-width: 900px) { .topo { flex-direction: column; align-items: flex-start; } .titulo { font-size: 1.45rem; } }
-.titulo span { color: #116FFF; }
-.subtitulo { color: #00D8FF; font-weight: 600; font-size: 1rem; margin-top: 6px; }
+/* Título em UMA linha: tamanho acompanha a largura da tela; "Preços de Combustíveis" em degradê azul -> ciano
+   com brilho suave; barra de destaque abaixo */
+/* o tamanho da letra acompanha a LARGURA DO ESPAÇO DO TÍTULO (cqi = 1% do container): sempre cabe em 1 linha */
+.topo > div:first-child { container-type: inline-size; }
+.titulo { color: #FFFFFF; font-size: clamp(1.1rem, 3.5cqi, 2.8rem); font-weight: 900; line-height: 1.1;
+    text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap;
+    text-shadow: 0 2px 18px rgba(0,216,255,.18); }
+.titulo span { background: linear-gradient(90deg, #116FFF 0%, #0A88F4 40%, #00D8FF 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 14px rgba(0,216,255,.35)); }
+.barra-titulo { width: 120px; height: 4px; border-radius: 4px; margin: 10px 0 8px 0;
+    background: linear-gradient(90deg, #116FFF, #00D8FF); box-shadow: 0 0 12px rgba(0,216,255,.6); }
+@media (max-width: 900px) { .titulo { white-space: normal; font-size: 1.45rem; } }
+.subtitulo { color: #00D8FF; font-weight: 600; font-size: 1rem; }
 .logos { display: flex; align-items: center; gap: 14px; background: #FFFFFF; border-radius: 14px; padding: 8px 14px;
     flex-shrink: 0; }
 .logos img.impacta { height: 44px; }
@@ -130,7 +149,7 @@ html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { fon
 .logos .nome-impacta small { display: block; font-weight: 600; font-size: .62rem; letter-spacing: .5px; color: #4A6B7C; }
 .logos .sep { width: 1px; height: 40px; background: #D5DEE3; }
 .logos img.anp { height: 46px; }
-.chips { margin: 4px 0 16px 0; }
+.chips { margin: 6px 0 0 0; }
 .chip { display: inline-block; border: 1.5px solid #116FFF; color: #FFFFFF; border-radius: 50px;
     padding: 4px 14px; margin: 4px 8px 4px 0; font-size: 0.80rem; font-weight: 600; background: rgba(17,111,255,.10); }
 /* Chip com link (professor): mesma aparência; ao passar o mouse, preenche de azul */
@@ -141,15 +160,38 @@ a.chip:hover { background: #116FFF; }
 [data-testid="stSidebar"] a.link-discreto:hover { text-decoration: underline; }
 
 /* Faixa de destaque e cartões */
-.destaque { background: linear-gradient(100deg, #116FFF 0%, #0A88F4 55%, #00D8FF 100%); color: #FFFFFF;
-    border-radius: 16px; padding: 18px 26px; font-size: 1.1rem; font-weight: 700; line-height: 1.45;
-    box-shadow: 0 6px 24px rgba(17,111,255,.35); margin-bottom: 18px; }
-.cartoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 18px; }
-.cartao { background: #13252D; border: 1px solid #1B3440; border-radius: 18px; padding: 16px 20px; border-top: 4px solid #116FFF; }
+/* Faixa de apresentação: neutra (sem degradê forte), para não competir com o título e a caixa de pergunta */
+.destaque { background: #10222A; color: rgba(255,255,255,.82); border: 1px solid #1B3440; border-left: 4px solid #00D8FF;
+    border-radius: 12px; padding: 12px 20px; font-size: 0.98rem; font-weight: 500; line-height: 1.45; margin-bottom: 14px; }
+/* Cartões mais largos (ocupam a área central) e mais baixos */
+.cartoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+.cartao { background: #13252D; border: 1px solid #1B3440; border-radius: 14px; padding: 10px 18px 8px 18px; border-top: 3px solid #116FFF; }
 .cartao.ciano { border-top-color: #00D8FF; } .cartao.vermelho { border-top-color: #F44336; }
-.cartao h4 { color: #FFFFFF; margin: 0 0 8px 0; font-size: 0.95rem; text-transform: uppercase; letter-spacing: .5px; font-weight: 800; }
-.cartao ul { margin: 0; padding-left: 18px; color: rgba(255,255,255,.80); font-size: 0.88rem; }
+.cartao h4 { color: #FFFFFF; margin: 0 0 4px 0; padding: 0; font-size: 0.82rem; text-transform: uppercase; letter-spacing: .6px; font-weight: 800; }
+.cartao ul { margin: 0; padding-left: 16px; color: rgba(255,255,255,.78); font-size: 0.82rem; line-height: 1.35; }
+.cartao li { margin: 0; }
 @media (max-width: 900px) { .cartoes { grid-template-columns: 1fr; } }
+
+/* Perguntas de exemplo no centro (botões contornados, mesma altura) */
+.exemplos-titulo { font-weight: 800; letter-spacing: 1px; font-size: 0.74rem; text-transform: uppercase; color: #00D8FF;
+    margin: 2px 0 6px 0; }
+.st-key-exemplos .stButton button { background: rgba(17,111,255,.08); border: 1.5px solid #1B3F66; border-radius: 12px;
+    color: #E8EEF2; font-size: 0.84rem; font-weight: 600; min-height: 64px; height: 100%; text-align: left; }
+.st-key-exemplos .stButton button p { white-space: normal !important; overflow: visible !important;
+    text-overflow: clip !important; line-height: 1.3; }                 /* texto completo, em várias linhas */
+/* os 5 botões com a MESMA altura (a do maior texto): a altura 100% passa por toda a cadeia de elementos */
+.st-key-exemplos [data-testid="stColumn"] [data-testid="stVerticalBlock"],
+.st-key-exemplos [data-testid="stColumn"] [data-testid="stElementContainer"],
+.st-key-exemplos .stButton, .st-key-exemplos .stButton button { height: 100%; }
+.st-key-exemplos .stButton button:hover { border-color: #00D8FF; background: rgba(0,216,255,.10); color: #FFFFFF; }
+
+/* Caixa de pergunta em destaque e botão "Localização" com a MESMA altura */
+[data-testid="stChatInput"] { border: 2px solid #116FFF !important; border-radius: 16px !important; background: #13252D !important;
+    box-shadow: 0 0 0 4px rgba(17,111,255,.15), 0 8px 28px rgba(17,111,255,.30); min-height: 76px; }
+[data-testid="stChatInput"] textarea { font-size: 1.02rem !important; }
+[data-testid="stBottom"] [data-testid="stPopover"] button { min-height: 76px; border: 2px solid #116FFF; border-radius: 16px;
+    background: #13252D; font-weight: 700; box-shadow: 0 0 0 4px rgba(17,111,255,.15), 0 8px 28px rgba(17,111,255,.30); }
+[data-testid="stBottom"] [data-testid="stPopover"] button:hover { background: #116FFF; }
 
 /* Mensagens da conversa: pergunta (azul) e resposta (ciano) bem separadas.
    Cada mensagem leva um marcador invisível (.msg-usuario / .msg-analista) e o CSS usa :has() para estilizá-la. */
@@ -310,6 +352,24 @@ st.session_state.setdefault("perguntas_feitas", 0)   # NÃO zera no "Nova conver
 st.session_state.setdefault("localizacao", None)     # {"lat", "lon", "fonte", "descricao"} — só nesta sessão
 st.session_state.setdefault("pedindo_gps", False)
 st.session_state.setdefault("erro_local", None)
+st.session_state.setdefault("sessao_id", uuid.uuid4().hex[:8])   # id ALEATÓRIO da sessão (agrupa as perguntas)
+
+
+def contexto_registro() -> dict:
+    """Dados técnicos de acesso para o registro (5.10). IP: o 1º do X-Forwarded-For (atrás do proxy do Streamlit
+    Cloud) ou o da conexão. Sem nome da máquina e sem geolocalização pelo IP (decisão do aluno)."""
+    cabecalhos = st.context.headers or {}
+    ip = (cabecalhos.get("X-Forwarded-For") or "").split(",")[0].strip() or st.context.ip_address
+    return {"sessao": st.session_state.sessao_id, "ip": ip, "user_agent": cabecalhos.get("User-Agent"),
+            "fuso": st.context.timezone, "idioma": st.context.locale, "localizacao": st.session_state.localizacao}
+
+
+def credenciais_registro() -> tuple[dict | None, str | None]:
+    """Credencial da conta de serviço e link da planilha — SÓ nos Secrets (online) ou .streamlit/secrets.toml (local)."""
+    try:
+        return dict(st.secrets["gcp_service_account"]), st.secrets["registro"]["planilha_url"]
+    except Exception:
+        return None, None                                  # sem credencial: o registro vai para logs/perguntas.csv
 
 # ---------------------------------------------------------------------------
 # Barra lateral
@@ -323,12 +383,10 @@ with st.sidebar:
                 + "<br>".join(nomes) + "</div>", unsafe_allow_html=True)
     st.markdown('<div class="lateral-titulo">Fonte dos dados</div>'
                 f'<div class="lateral-texto"><a href="{FONTE_URL}" target="_blank">ANP — Série Histórica de Preços '
-                'de Combustíveis</a><br>jan/2020 a 21/11/2026 · amostra de postos</div>', unsafe_allow_html=True)
+                'de Combustíveis</a> (jan/2020 a jun/2026)<br>'
+                f'<a href="{FONTE_SEMANAL_URL}" target="_blank">ANP — Levantamento de Preços: últimas semanas '
+                'pesquisadas</a> (jul a 21/11/2026)<br>amostra de postos</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="lateral-titulo">Experimente perguntar</div>', unsafe_allow_html=True)
-    for i, exemplo in enumerate(EXEMPLOS):
-        if st.button(exemplo, key=f"ex_{i}", use_container_width=True):
-            st.session_state.pendente = exemplo
 
 
     st.markdown('<div class="lateral-titulo">Agentes e modelos</div><div class="lateral-texto">'
@@ -345,6 +403,10 @@ with st.sidebar:
     if st.button("🗑️ Nova conversa", use_container_width=True):   # limpa a conversa, mas não o limite
         st.session_state.mensagens, st.session_state.custo_sessao, st.session_state.pendente = [], 0.0, None
         st.rerun()
+    # Aviso de privacidade (LGPD: informar o que é registrado e para quê)
+    st.markdown('<div class="lateral-texto" style="margin-top:14px"><small>🔒 Para fins acadêmicos, registramos as '
+                'perguntas e dados técnicos de acesso (IP, navegador, sistema, fuso e, se usada, a localização '
+                'aproximada ou o CEP). Não pedimos nome nem dados pessoais.</small></div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Cabeçalho: título do projeto + logos + curso, matéria e professor
@@ -357,16 +419,23 @@ bloco_logos = (
     + '<div class="sep"></div>'
     + (f'<img class="anp" src="{logo_anp}" alt="ANP — fonte dos dados">' if logo_anp else '<b style="color:#00A651">ANP</b>')
     + "</div>")
+# Linha 1: título na largura inteira (assim cabe em 1 linha com letra grande).
+# Linha 2: subtítulo + chips (curso, matéria, professor) à esquerda e os logos à direita.
 st.markdown(f"""
 <div class="topo">
   <div>
     <div class="titulo">Analista Virtual de <span>Preços de Combustíveis</span></div>
+    <div class="barra-titulo"></div>
+  </div>
+</div>
+<div class="linha-info">
+  <div>
     <div class="subtitulo">{SUBTITULO}</div>
+    <div class="chips">
+      <a class="chip" href="{CURSO_URL}" target="_blank" title="Página do curso na Impacta">🎓 {CURSO}</a><span class="chip">📘 Matéria: {MATERIA}</span><a class="chip" href="{PROFESSOR_URL}" target="_blank" title="LinkedIn do professor">👨‍🏫 {PROFESSOR}</a>
+    </div>
   </div>
   {bloco_logos}
-</div>
-<div class="chips">
-  <a class="chip" href="{CURSO_URL}" target="_blank" title="Página do curso na Impacta">🎓 {CURSO}</a><span class="chip">📘 Matéria: {MATERIA}</span><a class="chip" href="{PROFESSOR_URL}" target="_blank" title="LinkedIn do professor">👨‍🏫 {PROFESSOR}</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -390,11 +459,26 @@ base da ANP com SQL e respondem com texto, tabela e o SQL usado.</div>
     <li>Não cobre todos os postos (é uma amostra da ANP)</li>
     <li>Não prevê preços futuros</li></ul></div>
 </div>"""
+
+
+def mostrar_exemplos() -> None:
+    """Perguntas de exemplo no CENTRO da página (antes ficavam na barra lateral). Clicar = enviar a pergunta.
+    Ficam ANTES do ponto em que o script lê st.session_state.pendente, então o 'if st.button' simples funciona."""
+    st.markdown('<div class="exemplos-titulo">Experimente perguntar</div>', unsafe_allow_html=True)
+    with st.container(key="exemplos"):                    # key -> classe CSS "st-key-exemplos" (estilo dos botões)
+        for coluna, (i, exemplo) in zip(st.columns(len(EXEMPLOS)), enumerate(EXEMPLOS)):
+            with coluna:
+                if st.button(exemplo, key=f"ex_{i}", use_container_width=True):
+                    st.session_state.pendente = exemplo
+
+
 if st.session_state.mensagens:
-    with st.expander("ℹ️ Sobre o analista virtual"):
+    with st.expander("ℹ️ Sobre o analista virtual e perguntas de exemplo"):
         st.markdown(APRESENTACAO, unsafe_allow_html=True)
+        mostrar_exemplos()
 else:
     st.markdown(APRESENTACAO, unsafe_allow_html=True)
+    mostrar_exemplos()
 
 # ---------------------------------------------------------------------------
 # Conversa
@@ -441,11 +525,15 @@ if pergunta:
                 st.session_state.mensagens.pop()        # tira a pergunta sem resposta do histórico
                 devolver_pergunta()                     # e ela não conta no limite
                 st.error(f"⚠️ {erro}")
+                registro.registrar(registro.montar_linha(contexto_registro(), pergunta, erro=str(erro)),
+                                   *credenciais_registro())
         if res:
             mostrar_resposta(res)
     if res:
         st.session_state.mensagens.append({"papel": "assistente", "texto": res["resposta"], "res": res})
         st.session_state.custo_sessao += res["uso"]["custo_usd"]
+        # Registro da pergunta (planilha Google; reserva em CSV) — em segundo plano, não atrasa a resposta
+        registro.registrar(registro.montar_linha(contexto_registro(), pergunta, res), *credenciais_registro())
     # Atualiza só o gasto e o contador na barra lateral (um st.rerun() levaria a página de volta ao topo da conversa)
     gasto_sessao.markdown(f'<div class="lateral-texto">US$ {st.session_state.custo_sessao:.4f}</div>',
                           unsafe_allow_html=True)
@@ -526,5 +614,5 @@ with st._bottom:                                      # rodapé fixo da página,
             st.markdown("**Experimente:**")
             st.button(f"💬 {EXEMPLO_PROXIMOS}", on_click=_exemplo_proximos, use_container_width=True,
                       disabled=esgotado)
-            st.caption("A localização é usada só para calcular a distância até os postos (vai na consulta aos "
-                       "agentes) e não fica guardada.")
+            st.caption("A localização é usada para calcular a distância até os postos (vai na consulta aos "
+                       "agentes). No registro de uso fica só aproximada (~1 km) ou o CEP informado.")

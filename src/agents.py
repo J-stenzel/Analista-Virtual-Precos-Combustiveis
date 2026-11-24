@@ -97,8 +97,9 @@ PASSOS
      (ex.: "ranking entre locais -> R05", "média por posto -> R13"). mensagem_usuario = null.
    - POSTOS PERTO DO USUÁRIO ("perto de mim", "mais próximos", "num raio de X km") -> R15. O app informa, numa
      mensagem própria, se a localização do usuário está DISPONÍVEL. Sem localização -> ESCLARECIMENTO pedindo para
-     clicar em "📍 Usar minha localização" ou informar o CEP. Sem raio na pergunta (nem no histórico) ->
-     ESCLARECIMENTO perguntando a distância (sugira 3 km). Com os dois -> DADOS (mantenha o raio na pergunta_completa).
+     clicar em "📍 Localização" (botão do navegador ou CEP). Com localização -> DADOS, mesmo SEM raio: se o usuário
+     informou o raio (na pergunta ou no histórico, ex.: "sim, até 10 km"), mantenha-o na pergunta_completa; se não
+     informou, escreva na pergunta_completa "raio automático (3 km; se não houver postos, 5 km)" (R15).
    - ESCLARECIMENTO ou FORA_DE_ESCOPO: mensagem_usuario = texto curto e educado em português (uma pergunta
      objetiva, ou a recusa com o motivo e uma sugestão do que a base responde). Os outros campos = null.
 
@@ -295,6 +296,10 @@ def detectar_ressalvas(colunas: list, linhas: list, sql: str) -> list:
     if sum(1 for c in colunas if c.lower().startswith("postos_")) >= 2:
         ressalvas.append(_camada["ressalvas"]["amostra_muda"])
     if any("distancia" in c.lower() for c in colunas):                      # postos próximos (R15)
+        if not linhas:                                                       # nada no raio -> perguntar 10 km
+            ressalvas.append(" ".join(_camada["ressalvas"]["sem_postos_no_raio"].split()))
+        elif "raio_km" in colunas and any(linha[colunas.index("raio_km")] == 5 for linha in linhas):
+            ressalvas.append(_camada["ressalvas"]["raio_ampliado"])          # 3 km vazio -> ampliou para 5 km
         ressalvas.append(_camada["ressalvas"]["distancia"])
     if re.search(r"\bano\s*=\s*2026\b", sql or "", re.I) and not re.search(r"ano_mes|trimestre|semestre", sql or "", re.I):
         ressalvas.append(_camada["ressalvas"]["ano_incompleto"])

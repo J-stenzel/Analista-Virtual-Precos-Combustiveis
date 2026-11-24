@@ -59,7 +59,8 @@ E sabe **não** responder:
 - *Liste os 10 postos mais próximos de mim com a gasolina mais barata num raio de 3 km* → o usuário informa a
   localização pelo botão **📍 Usar minha localização** (o navegador pede permissão) ou por um **CEP**; o Agente
   SQL calcula a distância em linha reta (fórmula de haversine) até os postos com coordenada e ordena pelo preço
-  (regra **R15**). Sem raio, o sistema pergunta a distância (sugere 3 km); sem localização, pede o botão ou o CEP.
+  (regra **R15**). Sem raio na pergunta, usa **3 km** e, se não houver posto, amplia sozinho para **5 km**; se
+  ainda assim não achar, avisa e pergunta se quer buscar **até 10 km**. Sem localização, pede o botão ou o CEP.
 - Coordenadas dos postos: `src/geocodificar_postos.py` (Google Geocoding; ~2 mil postos ativos de SP, cache com
   retomada, teto de consultas, validação do município). Ficam na `dim_posto` com a data `geocodificado_em`
   (os termos do Google permitem guardar coordenadas por até **30 dias** — depois, apagar ou refazer).
@@ -111,8 +112,9 @@ pip install -r requirements.txt
 **2. Banco de dados** — o arquivo `data/processed/combustiveis.duckdb` (~42 MB) já vem no repositório.
 Para recriá-lo a partir dos dados originais: baixe os CSVs semestrais de **combustíveis automotivos** de 2020.01 a
 2026.01 em [ANP — Série Histórica de Preços de Combustíveis](https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis)
-e salve-os em `data/raw/`; os relatórios **semanais** da ANP (`revendas_lpc_*.xlsx`, de 28/06 a 21/11/2026) vão em
-`data/raw_semanal/`. Depois rode (≈1 min, com 17 testes de qualidade):
+e salve-os em `data/raw/`; os relatórios **semanais** da ANP (`revendas_lpc_*.xlsx`, de 28/06 a 21/11/2026), baixados em
+[ANP — Levantamento de Preços de Combustíveis: últimas semanas pesquisadas](https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/levantamento-de-precos-de-combustiveis-ultimas-semanas-pesquisadas),
+vão em `data/raw_semanal/`. Depois rode (≈1 min, com 17 testes de qualidade):
 ```bash
 python src/load_data.py
 ```
@@ -135,9 +137,17 @@ streamlit run src/app.py
 (branch `main`, arquivo `src/app.py`) e cole a chave em **Settings → Secrets** (formato TOML):
 ```toml
 OPENAI_API_KEY = "sk-..."
+GOOGLE_MAPS_API_KEY = "..."          # opcional: CEP do usuário (postos perto de mim)
+
+[registro]                           # opcional: registro das perguntas numa planilha Google
+planilha_url = "https://docs.google.com/spreadsheets/d/.../edit"
+
+[gcp_service_account]                # conta de serviço (campos do .json), com a planilha compartilhada como Editor
+type = "service_account"
+# project_id, private_key_id, private_key, client_email, client_id, ... (copiar do .json)
 ```
-A chave fica só nos Secrets do Streamlit (criptografados), nunca no GitHub; o `app.py` copia os Secrets para as
-variáveis de ambiente que o `llm.py` lê.
+As chaves ficam só nos Secrets do Streamlit (criptografados), nunca no GitHub; o `app.py` copia os Secrets para as
+variáveis de ambiente que o `llm.py` lê. Localmente, o mesmo conteúdo vai em `.streamlit/secrets.toml` (no `.gitignore`).
 
 **Outras formas de usar**
 | Comando | O que faz |
@@ -161,7 +171,13 @@ python eval/conferir_golden_set.py
 
 ## 4. Dados e modelo
 
-**Fonte:** ANP — Série Histórica de Preços de Combustíveis (Levantamento de Preços de Combustíveis), dados abertos.
+**Fontes (ANP, dados abertos):**
+- [Série Histórica de Preços de Combustíveis](https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis)
+  — arquivos semestrais (CSV), jan/2020 a jun/2026;
+- [Levantamento de Preços de Combustíveis — últimas semanas pesquisadas](https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/levantamento-de-precos-de-combustiveis-ultimas-semanas-pesquisadas)
+  — relatórios semanais por posto (.xlsx), de 28/06 a 21/11/2026 (mesma pesquisa, base atual).
+
+
 Preços de venda ao consumidor coletados semanalmente numa **amostra** de postos de ~470 municípios,
 **01/01/2020 a 21/11/2026**: série histórica semestral até jun/2026 (13 arquivos CSV) + 21 relatórios
 **semanais** de 28/06 a 21/11/2026 (.xlsx), ~5,81 milhões de linhas. Sem dados pessoais sensíveis.
@@ -220,6 +236,11 @@ O SQL gerado pela LLM é tratado como **entrada não confiável** (equivalente a
 10. **Limite de uso no app** — 20 perguntas por sessão do navegador e 500 por dia no app inteiro (contador
     compartilhado, que o F5 não zera); a pergunta conta antes de chamar a LLM e é devolvida se a OpenAI falhar.
     Ajustável por `LIMITE_SESSAO` e `LIMITE_DIA` no `.env`/Secrets.
+11. **Registro de uso (LGPD)** — cada pergunta vira uma linha numa planilha Google (`src/registro.py`, conta de
+    serviço com acesso só a essa planilha; em segundo plano; sem credencial ou se o Google falhar, vai para
+    `logs/perguntas.csv`). Guarda data/hora, sessão (id aleatório), IP, navegador, sistema, fuso, idioma,
+    localização aproximada (~1 km) ou o CEP, pergunta, tipo de resposta, custo e tempo — **sem** nome da máquina,
+    geolocalização pelo IP ou dados pessoais. O app avisa o usuário na barra lateral.
 
 `tests/testar_tools.py` verifica 55 casos, incluindo 27 ataques e consultas proibidas bloqueados e a conexão recusando
 ataques sozinha (sem depender do validador).
@@ -280,6 +301,7 @@ custaram menos de US$ 8. Cada chamada é registrada em `logs/uso_llm.csv`.
 │   ├── load_data.py           # carga + limpeza + modelo estrela + testes de qualidade
 │   ├── geocodificar_postos.py # coordenadas dos postos (Google; complemento "postos perto de mim")
 │   ├── geo.py                 # CEP do usuário -> coordenada (Google; só na sessão)
+│   ├── registro.py            # registro das perguntas (planilha Google; reserva em CSV)
 │   ├── semantic_layer.yaml    # camada semântica
 │   ├── tools.py               # get_schema, get_metric, validate_sql, run_sql
 │   ├── agents.py              # orquestrador, agente SQL, agente analista

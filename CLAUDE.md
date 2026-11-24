@@ -140,8 +140,16 @@
     ✅ 5.13e painel "📍 Localização" ao lado da caixa de pergunta (`st._bottom` + popover; exemplo saiu da lateral);
     Jeferson primeiro nos desenvolvedores (letra maior); link da graduação no chip do curso. Aluno ativou a
     **Routes API** (futuro: distância de carro) — a chave atual segue restrita à Geocoding.
-  - ⬜ 5.10 Registro das perguntas em CSV (IP, navegador/sistema, fuso, idioma, nome opcional; **sem** nome da máquina
-    e **sem** geolocalização). ⬜ 5.11 Planilha Google — mais à frente (aluno cria a conta de serviço).
+    ✅ (aprovados pelo aluno, 24/11) 5.13f layout novo (título 1 linha com `cqi`, logos na linha
+    dos chips, faixa neutra, exemplos no centro, caixa de pergunta = altura do botão Localização) e 5.13g R15 com
+    raio automático 3 → 5 km (numa só consulta, `raio_km`) e pergunta "até 10 km?" quando não acha (testado);
+    5.13h link da fonte semanal da ANP ("últimas semanas pesquisadas") na barra lateral e no README.
+  - ✅ 5.10/5.11 (24/11) **Registro das perguntas** na planilha Google do aluno (`src/registro.py`, gspread + conta de
+    serviço `registro-perguntas`; credencial e link em `.streamlit/secrets.toml` — fora do Git; NUNCA ler/expor esse
+    arquivo; testes só por script que não imprime segredos). Em segundo plano; reserva em `logs/perguntas.csv`.
+    Colunas: data_hora, sessao, ip, navegador, sistema, fuso, idioma, localizacao (~1 km ou CEP), pergunta, classe,
+    pergunta_interpretada, linhas, sql_ok_1a_tentativa, custo_usd, tempo_s, erro. Sem nome/máquina/geo por IP.
+    Aviso LGPD na barra lateral. **Pendente do aluno:** colar `[registro]` + `[gcp_service_account]` nos Secrets online.
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
     explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
   Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).

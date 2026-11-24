@@ -160,9 +160,12 @@
 - ✅ 5.9 Limite de uso: 20 perguntas por sessão + 500 por dia no app inteiro (contador compartilhado com trava;
   F5 e "Nova conversa" não zeram; pergunta devolvida se a OpenAI falhar; caixa desabilitada ao atingir).
   Testado numa cópia com limites 1 (sessão e dia). `LIMITE_SESSAO`/`LIMITE_DIA` no `.env.example` e README
-- ⬜ 5.10 Registro das perguntas: data, sessão, IP, navegador/sistema, fuso, idioma, nome opcional, pergunta,
-  tipo, custo (SEM nome da máquina e SEM geolocalização — decisão do aluno). CSV local agora
-- ⬜ 5.11 Planilha Google (conta de serviço) — mais à frente, com tutorial para o aluno
+- ✅ 5.10 Registro das perguntas (`src/registro.py`): data/hora, sessão (id aleatório), IP, navegador, sistema,
+  fuso, idioma, localização (~1 km) ou CEP, pergunta, tipo, pergunta interpretada, linhas, SQL 1ª, custo, tempo,
+  erro — SEM nome da máquina e SEM geolocalização pelo IP (decisão do aluno); em segundo plano; aviso LGPD no app
+- ✅ 5.11 Planilha Google (gspread + conta de serviço; credencial em `.streamlit/secrets.toml`, fora do Git;
+  reserva em `logs/perguntas.csv`). Testado: cabeçalho criado e a pergunta "álcool em Floripa" registrada.
+  ⚠️ Aluno: colar `[registro]` e `[gcp_service_account]` também nos Secrets do Streamlit Cloud
 - ✅ 5.12 Base atualizada com os **relatórios semanais** da ANP (aluno baixou 21 .xlsx, 28/06 a 21/11/2026)
   - ✅ Exploração: cabeçalho na linha 10 nos 21 arquivos; 7 diferenças de formato mapeadas (CNPJ/CEP numéricos,
     estado por extenso, sem região, nomes de produto, GLP, colunas extras)
@@ -191,6 +194,14 @@
     pergunta (rodapé `st._bottom` + popover; botões com callbacks); desenvolvedores com Jeferson primeiro e letra
     maior; link da graduação no chip do curso; título menor em telas estreitas. Testado (CEP → exemplo → R$ 5,79).
     Aluno ativou a Routes API para o futuro (a chave atual continua restrita à Geocoding)
+  - ✅ 5.13f (aprovado e commitado) Layout: título em 1 linha com degradê/brilho e barra;
+    logos na linha dos chips; faixa de apresentação neutra; área central 1.480 px; cards mais baixos; exemplos no
+    centro (5 botões, mesma altura); caixa de pergunta em destaque com a mesma altura do botão Localização (76 px)
+  - ✅ 5.13g (aprovado e commitado) R15 com **raio automático**: sem raio -> 3 km; nada -> 5 km (mesma
+    consulta, coluna raio_km); nada até 5 km -> avisa e pergunta se busca até 10 km. Testado com os 3 agentes:
+    MASP (3 km), Cantareira B (ampliou p/ 5 km), Serra da Cantareira (0 → pergunta 10 km → "sim" → 10 postos)
+  - ✅ 5.13h (aprovado e commitado) Fonte dos dados semanais ("Levantamento de Preços — últimas semanas
+    pesquisadas", ANP) citada na barra lateral do app e no README, ao lado da Série Histórica
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação
