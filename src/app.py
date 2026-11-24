@@ -43,12 +43,13 @@ from streamlit_js_eval import get_geolocation  # noqa: E402  (localização do n
 PROJETO = "Analista Virtual de Preços de Combustíveis"
 SUBTITULO = "Projeto Final — Do BI ao Analista Virtual"
 CURSO = "Tecnólogo em Banco de Dados — Faculdade de Tecnologia Impacta"
+CURSO_URL = "https://www.impacta.edu.br/graduacoes/banco-de-dados"
 MATERIA = "Artificial Intelligence"
 PROFESSOR = "Prof. Dr. Cesar Augusto Cardoso Caetano"
 PROFESSOR_URL = "https://www.linkedin.com/in/cesaraccaetano/"
 # (nome, link do LinkedIn ou None) — o link não muda a aparência do nome
-DESENVOLVEDORES = [("Douglas H. da Silva", None),
-                   ("Jeferson Stenzel", "https://www.linkedin.com/in/jeferson-stenzel/"),
+DESENVOLVEDORES = [("Jeferson Stenzel", "https://www.linkedin.com/in/jeferson-stenzel/"),   # versão do Jeferson
+                   ("Douglas H. da Silva", None),
                    ("Leonardo M. L. Rodrigues", None),
                    ("Leonardo M. Lima", None)]
 FONTE_URL = "https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis"
@@ -68,8 +69,9 @@ EXEMPLOS = [
     "Qual o preço do GNV no Rio de Janeiro?",
     "Como variou mês a mês o preço médio da gasolina no Paraná em 2025?",
     "Quais os 5 estados com o etanol mais barato atualmente?",
-    "Liste os 10 postos mais próximos de mim com a gasolina mais barata num raio de 3 km",   # 5.13 (só SP)
 ]
+# Exemplo do complemento 5.13 (só SP): fica no painel "📍 Localização", ao lado da caixa de pergunta
+EXEMPLO_PROXIMOS = "Liste os 10 postos mais próximos de mim com a gasolina mais barata num raio de 3 km"
 ETAPAS = {"orquestrador": "🧭 Orquestrador: entendendo a pergunta e buscando o contexto…",
           "sql": "🧮 Agente SQL: escrevendo, validando e executando a consulta…",
           "analista": "✍️ Agente Analista: redigindo a resposta…"}
@@ -111,13 +113,14 @@ html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { fon
 .lateral-titulo { font-weight: 800; letter-spacing: 1px; font-size: 0.74rem; text-transform: uppercase; color: #00D8FF !important;
     margin: 16px 0 4px 0; }
 .lateral-texto { font-size: 0.86rem; line-height: 1.4; color: rgba(255,255,255,.85) !important; }
+.lateral-devs { font-size: 0.95rem; line-height: 1.5; }   /* nomes do grupo um pouco maiores */
 
 /* Cabeçalho */
 .topo { display: flex; align-items: center; justify-content: space-between; gap: 24px;
     border-bottom: 1px solid #1B3440; padding-bottom: 14px; margin-bottom: 12px; }
 .topo > div:first-child { flex: 1; min-width: 0; }
 .titulo { color: #FFFFFF; font-size: 1.9rem; font-weight: 900; line-height: 1.12; text-transform: uppercase; letter-spacing: .5px; }
-@media (max-width: 900px) { .topo { flex-direction: column; align-items: flex-start; } }
+@media (max-width: 900px) { .topo { flex-direction: column; align-items: flex-start; } .titulo { font-size: 1.45rem; } }
 .titulo span { color: #116FFF; }
 .subtitulo { color: #00D8FF; font-weight: 600; font-size: 1rem; margin-top: 6px; }
 .logos { display: flex; align-items: center; gap: 14px; background: #FFFFFF; border-radius: 14px; padding: 8px 14px;
@@ -306,6 +309,7 @@ if "mensagens" not in st.session_state:
 st.session_state.setdefault("perguntas_feitas", 0)   # NÃO zera no "Nova conversa" (senão furaria o limite)
 st.session_state.setdefault("localizacao", None)     # {"lat", "lon", "fonte", "descricao"} — só nesta sessão
 st.session_state.setdefault("pedindo_gps", False)
+st.session_state.setdefault("erro_local", None)
 
 # ---------------------------------------------------------------------------
 # Barra lateral
@@ -315,7 +319,7 @@ with st.sidebar:
                 f'<div class="lateral-texto"><b>{PROJETO}</b><br>{SUBTITULO}</div>', unsafe_allow_html=True)
     nomes = [f'<a class="link-discreto" href="{url}" target="_blank" title="LinkedIn de {nome}">{nome}</a>'
              if url else nome for nome, url in DESENVOLVEDORES]
-    st.markdown('<div class="lateral-titulo">Desenvolvedores</div><div class="lateral-texto">'
+    st.markdown('<div class="lateral-titulo">Desenvolvedores</div><div class="lateral-texto lateral-devs">'
                 + "<br>".join(nomes) + "</div>", unsafe_allow_html=True)
     st.markdown('<div class="lateral-titulo">Fonte dos dados</div>'
                 f'<div class="lateral-texto"><a href="{FONTE_URL}" target="_blank">ANP — Série Histórica de Preços '
@@ -326,41 +330,6 @@ with st.sidebar:
         if st.button(exemplo, key=f"ex_{i}", use_container_width=True):
             st.session_state.pendente = exemplo
 
-    # --- Localização do usuário (5.13: "postos perto de mim", só SP por enquanto) ---
-    st.markdown('<div class="lateral-titulo">📍 Sua localização</div>', unsafe_allow_html=True)
-    local = st.session_state.localizacao
-    if local:
-        st.markdown(f'<div class="lateral-texto">✅ {local["fonte"]}<br><small>{local.get("descricao", "")}</small></div>',
-                    unsafe_allow_html=True)
-        if st.button("Remover localização", use_container_width=True):
-            st.session_state.localizacao = None
-            st.rerun()
-    else:
-        if st.button("📍 Usar minha localização", use_container_width=True):
-            st.session_state.pedindo_gps = True                   # o navegador vai pedir permissão
-        if st.session_state.pedindo_gps:
-            gps = get_geolocation(component_key="gps")            # 1ª execução: None; depois, a resposta do navegador
-            if gps:
-                st.session_state.pedindo_gps = False
-                coords = gps.get("coords") if isinstance(gps, dict) else None
-                if coords and coords.get("latitude") is not None:
-                    st.session_state.localizacao = {"lat": coords["latitude"], "lon": coords["longitude"],
-                                                    "fonte": "localização do navegador",
-                                                    "descricao": f"precisão ~{round(coords.get('accuracy') or 0)} m"}
-                    st.rerun()
-                else:
-                    st.warning("Não foi possível obter a localização (permissão negada?). Informe um CEP.")
-        with st.form("form_cep", clear_on_submit=False, border=False):
-            cep = st.text_input("ou informe um CEP", placeholder="ex.: 01310-200", max_chars=10)
-            if st.form_submit_button("Usar este CEP", use_container_width=True):
-                r = geo.geocodificar_cep(cep)
-                if r["ok"]:
-                    st.session_state.localizacao = {k: r[k] for k in ("lat", "lon", "fonte", "descricao")}
-                    st.rerun()
-                st.warning(r["erro"])
-    st.markdown('<div class="lateral-texto"><small>Usada só para calcular a distância até os postos (vai na consulta '
-                'aos agentes); não fica guardada. Postos com localização: estado de SP.</small></div>',
-                unsafe_allow_html=True)
 
     st.markdown('<div class="lateral-titulo">Agentes e modelos</div><div class="lateral-texto">'
                 f'🧭 Orquestrador: {llm.MODELOS["orquestrador"]}<br>🧮 Agente SQL: {llm.MODELOS["sql"]}<br>'
@@ -397,7 +366,7 @@ st.markdown(f"""
   {bloco_logos}
 </div>
 <div class="chips">
-  <span class="chip">🎓 {CURSO}</span><span class="chip">📘 Matéria: {MATERIA}</span><a class="chip" href="{PROFESSOR_URL}" target="_blank" title="LinkedIn do professor">👨‍🏫 {PROFESSOR}</a>
+  <a class="chip" href="{CURSO_URL}" target="_blank" title="Página do curso na Impacta">🎓 {CURSO}</a><span class="chip">📘 Matéria: {MATERIA}</span><a class="chip" href="{PROFESSOR_URL}" target="_blank" title="LinkedIn do professor">👨‍🏫 {PROFESSOR}</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -494,6 +463,68 @@ esgotado = fim_sessao or fim_dia
 if esgotado and not bloqueio:
     st.info(f"🚦 Você usou as {LIMITE_SESSAO} perguntas desta sessão. Obrigado por testar o analista virtual!"
             if fim_sessao else f"🚦 O limite diário de {LIMITE_DIA} perguntas do app foi atingido. Volte amanhã!")
-st.chat_input("Limite de perguntas atingido." if esgotado else
-              "Pergunte sobre preços de combustíveis… (ex.: quanto está o diesel em Curitiba?)",
-              max_chars=MAX_CARACTERES, disabled=esgotado, key="entrada", on_submit=ao_enviar)
+
+# ---------------------------------------------------------------------------
+# Localização do usuário (complemento 5.13 — "postos perto de mim", só SP por enquanto).
+# Fica num painel ao lado da caixa de pergunta. Os botões usam CALLBACKS (on_click), que rodam ANTES da próxima
+# execução do script — como o da caixa de texto —, porque este trecho está no fim do script.
+# ---------------------------------------------------------------------------
+def _pedir_gps() -> None:
+    st.session_state.pedindo_gps, st.session_state.erro_local = True, None
+
+
+def _usar_cep() -> None:
+    r = geo.geocodificar_cep(st.session_state.get("cep_digitado", ""))
+    if r["ok"]:
+        st.session_state.localizacao = {k: r[k] for k in ("lat", "lon", "fonte", "descricao")}
+        st.session_state.erro_local = None
+    else:
+        st.session_state.erro_local = r["erro"]
+
+
+def _remover_local() -> None:
+    st.session_state.localizacao = None
+
+
+def _exemplo_proximos() -> None:
+    st.session_state.pendente = EXEMPLO_PROXIMOS
+
+
+if st.session_state.pedindo_gps:                       # o navegador pede permissão; a resposta chega num novo rerun
+    gps = get_geolocation(component_key="gps")
+    if gps:
+        st.session_state.pedindo_gps = False
+        coords = gps.get("coords") if isinstance(gps, dict) else None
+        if coords and coords.get("latitude") is not None:
+            st.session_state.localizacao = {"lat": coords["latitude"], "lon": coords["longitude"],
+                                            "fonte": "Localização do navegador",
+                                            "descricao": f"precisão ~{round(coords.get('accuracy') or 0)} m"}
+        else:
+            st.session_state.erro_local = "Não foi possível obter a localização (permissão negada?). Informe um CEP."
+        st.rerun()
+
+local = st.session_state.localizacao
+with st._bottom:                                      # rodapé fixo da página, onde fica a caixa de pergunta
+    col_pergunta, col_local = st.columns([4, 1.4], vertical_alignment="bottom")
+    with col_pergunta:
+        st.chat_input("Limite de perguntas atingido." if esgotado else
+                      "Pergunte sobre preços de combustíveis… (ex.: quanto está o diesel em Curitiba?)",
+                      max_chars=MAX_CARACTERES, disabled=esgotado, key="entrada", on_submit=ao_enviar)
+    with col_local:
+        with st.popover("✅ Localização" if local else "📍 Localização", use_container_width=True):
+            st.markdown("**Postos perto de você** · estado de SP")
+            if local:
+                st.success(f"{local['fonte']}  \n{local.get('descricao', '')}")
+                st.button("Remover localização", on_click=_remover_local, use_container_width=True)
+            else:
+                st.button("📍 Usar minha localização", on_click=_pedir_gps, use_container_width=True)
+                with st.form("form_cep", border=False):
+                    st.text_input("ou informe um CEP", key="cep_digitado", placeholder="ex.: 01310-200", max_chars=10)
+                    st.form_submit_button("Usar este CEP", on_click=_usar_cep, use_container_width=True)
+            if st.session_state.get("erro_local"):
+                st.warning(st.session_state.erro_local)
+            st.markdown("**Experimente:**")
+            st.button(f"💬 {EXEMPLO_PROXIMOS}", on_click=_exemplo_proximos, use_container_width=True,
+                      disabled=esgotado)
+            st.caption("A localização é usada só para calcular a distância até os postos (vai na consulta aos "
+                       "agentes) e não fica guardada.")

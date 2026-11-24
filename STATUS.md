@@ -187,6 +187,10 @@
     (= SQL direto); sem raio → pergunta a distância; sem localização → pede botão/CEP. Regressão dev 5/5 ✅
   - ⚠️ Aluno: apagar/refazer as coordenadas até ~25/12/2026 (termos do Google); baixar o limite diário para 200;
     colar `GOOGLE_MAPS_API_KEY` nos Secrets do Streamlit
+  - ✅ 5.13e Ajustes pedidos pelo aluno: localização + CEP + exemplo num painel "📍 Localização" AO LADO da caixa de
+    pergunta (rodapé `st._bottom` + popover; botões com callbacks); desenvolvedores com Jeferson primeiro e letra
+    maior; link da graduação no chip do curso; título menor em telas estreitas. Testado (CEP → exemplo → R$ 5,79).
+    Aluno ativou a Routes API para o futuro (a chave atual continua restrita à Geocoding)
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação

@@ -137,6 +137,9 @@
     (`streamlit-js-eval`) + CEP (`src/geo.py`) + exemplo. Testado no app (CEP, sem raio, sem localização) + dev 5/5.
     **Pendências do aluno:** Secrets `GOOGLE_MAPS_API_KEY`; limite diário do Google → 200; apagar/refazer as
     coordenadas até ~25/12/2026. Expandir para os demais estados = rodar `geocodificar_postos.py --uf XX`.
+    ✅ 5.13e painel "📍 Localização" ao lado da caixa de pergunta (`st._bottom` + popover; exemplo saiu da lateral);
+    Jeferson primeiro nos desenvolvedores (letra maior); link da graduação no chip do curso. Aluno ativou a
+    **Routes API** (futuro: distância de carro) — a chave atual segue restrita à Geocoding.
   - ⬜ 5.10 Registro das perguntas em CSV (IP, navegador/sistema, fuso, idioma, nome opcional; **sem** nome da máquina
     e **sem** geolocalização). ⬜ 5.11 Planilha Google — mais à frente (aluno cria a conta de serviço).
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
