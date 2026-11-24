@@ -119,6 +119,8 @@ html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea { fon
     margin: 16px 0 4px 0; }
 .lateral-texto { font-size: 0.86rem; line-height: 1.4; color: rgba(255,255,255,.85) !important; }
 .lateral-devs { font-size: 0.95rem; line-height: 1.5; }   /* nomes do grupo um pouco maiores */
+/* Aviso de privacidade: cor própria (#28596A), mais discreta (pedido do aluno) — vence a cor geral da lateral */
+[data-testid="stSidebar"] .aviso-privacidade, [data-testid="stSidebar"] .aviso-privacidade * { color: #28596A !important; }
 
 /* Cabeçalho */
 .topo { display: block; margin-bottom: 2px; }                     /* título sozinho, largura inteira */
@@ -404,7 +406,7 @@ with st.sidebar:
         st.session_state.mensagens, st.session_state.custo_sessao, st.session_state.pendente = [], 0.0, None
         st.rerun()
     # Aviso de privacidade (LGPD: informar o que é registrado e para quê)
-    st.markdown('<div class="lateral-texto" style="margin-top:14px"><small>🔒 Para fins acadêmicos, registramos as '
+    st.markdown('<div class="lateral-texto aviso-privacidade" style="margin-top:14px"><small>🔒 Para fins acadêmicos, registramos as '
                 'perguntas e dados técnicos de acesso (IP, navegador, sistema, fuso e, se usada, a localização '
                 'aproximada ou o CEP). Não pedimos nome nem dados pessoais.</small></div>', unsafe_allow_html=True)
 
