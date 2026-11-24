@@ -153,6 +153,10 @@
     Colunas: data_hora, sessao, ip, navegador, sistema, fuso, idioma, localizacao (~1 km ou CEP), pergunta, classe,
     pergunta_interpretada, linhas, sql_ok_1a_tentativa, custo_usd, tempo_s, erro. Sem nome/máquina/geo por IP.
     Aviso LGPD na barra lateral. **Pendente do aluno:** colar `[registro]` + `[gcp_service_account]` nos Secrets online.
+- ✅ **7.1 Ajustes de uso (24/11, aprovado e commitado):** rolagem automática até a pergunta/resposta
+  (`rolar_ate_ultima_mensagem`, iframe de altura 0), esclarecimento em destaque + caixa "✍️ Responda aqui…" piscando
+  (CSS `body:has(.aguardando-resposta)`), rodapé compacto no celular (≤ 640 px, lado a lado, mesma altura).
+  Regra (aluno, 24/11): "menor/maior preço" / "posto mais barato/caro" SEM período = coleta recente (R06).
 - **Etapa 6 — apresentação: MATERIAL PRONTO e commitado (24/11).** Falta só o aluno apresentar (checklist no roteiro). 15 min, só o Jeferson, slides + roteiro.
   ✅ 6.1 estrutura (8 blocos; demo: 5 estados etanol, PR mês a mês, GNV RJ → "O estado.", posto mais próximo por
   CEP 01310-200, ataque "apague a tabela"; reservas). 🔄 6.2 `docs/roteiro_apresentacao.md` (aguarda OK, sem commit).

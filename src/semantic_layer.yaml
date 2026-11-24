@@ -491,6 +491,7 @@ sinonimos:
     # Correção de 23/11 (achada nas perguntas de DESENVOLVIMENTO): "mais caro/mais barato" é ambíguo.
     # Entre GRUPOS (estados, municípios, regiões, bandeiras) = comparar o PREÇO MÉDIO (por posto, R13).
     # Só é MÁX/MÍN quando fala de um preço coletado ou de um POSTO ("maior preço encontrado", "posto mais caro").
+    # Ajuste de 24/11: MÁX/MÍN SEM período na pergunta = janela de coleta recente (R06), não a história inteira.
     amplitude: ["diferença entre o mais caro e o mais barato", "dispersão", "spread", "variação entre postos"]
     num_postos: ["quantos postos", "número de postos", "quantidade de postos"]
     variacao_percentual: ["variação", "aumento", "alta", "queda", "subiu", "caiu", "evolução em %", "reajuste"]
@@ -637,6 +638,10 @@ regras_de_negocio:
     regra: >
       "Recente" / "agora" para indicar ou listar POSTOS = os últimos 3 meses até o último mês
       com dados na base (hoje: set/2026 a 21/11/2026), usando a última coleta de cada posto na janela.
+      TAMBÉM vale para "menor/maior preço", "posto mais barato/mais caro" SEM período informado (decisão do aluno,
+      24/11, após um usuário perguntar o menor preço na Berrini e receber um preço de 2020): usar ESTA janela e a
+      última coleta de cada posto nela — nunca toda a história. Com período informado ("em 2020", "em março",
+      "desde 2020", "de todos os tempos"), vale o período do usuário.
     exemplo:
       pergunta: "Quais postos de Recife têm a gasolina aditivada mais barata agora?"
       resultado_teste: "1º: 247 COMERCIO LTDA (Afogados), R$ 6,93 em 17/06/2026."
@@ -792,6 +797,7 @@ checklist_sql:
   - "Produto filtrado (ou agrupado)? 'gasolina' virou 'GASOLINA'? (R10, R11)"
   - "Município com UF e sem acento? (R12)"
   - "Nenhum CURRENT_DATE / now() / today()? (R01)"
+  - "'Menor/maior preço' ou 'posto mais barato/caro' SEM período? Janela de coleta recente (R06), nunca a história toda."
   - "Média feita por posto? (R13)"
   - "Ranking: último trimestre da base + HAVING >= 5 postos? (R05)"
   - "SELECT traz as datas usadas (MIN/MAX de f.data)? (R09)"

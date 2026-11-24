@@ -219,6 +219,19 @@
   `docs/demo_apresentacao.md` + 8 prints em `docs/imagens/demo/`; roteiro corrigido (digitar a partir da P2, tempos
   reais, pular P2 se atrasar) — aprovado e commitado
 - ⬜ Apresentar (aluno), seguindo o checklist da véspera e do dia no roteiro
+
+## 7. Ajustes de uso (feedback de usuário, 24/11) ✅
+- ✅ 7.1 (aprovado e commitado) Um usuário não percebeu o pedido de esclarecimento ("menor preço na região da
+  Berrini") e não continuou. Correções no `app.py`:
+  - rolagem automática até a pergunta enviada e até o início da resposta (no celular a tela ficava parada);
+  - esclarecimento em quadro laranja com letra maior + caixa de pergunta com "✍️ Responda aqui…" piscando em laranja;
+  - celular (≤ 640 px): caixa e Localização lado a lado e com a mesma altura; rodapé de 311 → 154 px (38% → 19%);
+  - placeholder mais curto ("Pergunte sobre preços…").
+  Testado no celular (375 px) e no notebook (1440 px), incluindo o fluxo completo da Berrini.
+  - ✅ Regra decidida pelo aluno: "menor/maior preço" e "posto mais barato/caro" SEM período = janela de coleta
+    recente (R06), nunca a história toda (YAML: R06, sinônimos, checklist). Testado: Brooklin → R$ 5,99 em
+    17/11/2026 (antes: R$ 4,269 de 2020). Golden set e dev não mudam (as perguntas deles têm período).
+  - 💡 Limite visto: bairro/“região” depende do nome escrito na base (BROOKLIN × BROOKLIN PAULISTA)
 - ⬜ Demo ao vivo (com perguntas de reserva)
 - ⬜ Todos os membros sabem explicar qualquer parte do projeto
 

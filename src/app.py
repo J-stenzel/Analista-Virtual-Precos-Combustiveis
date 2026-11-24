@@ -19,6 +19,7 @@ from pathlib import Path
 import altair as alt
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Streamlit Community Cloud: a chave (e, se quiser, os modelos) fica em "Secrets" — NUNCA no GitHub.
 # Copia os Secrets para variáveis de ambiente ANTES de importar o llm.py (que lê os.getenv).
@@ -200,6 +201,43 @@ a.chip:hover { background: #116FFF; }
     background: #13252D; font-weight: 700; box-shadow: 0 0 0 4px rgba(17,111,255,.15), 0 8px 28px rgba(17,111,255,.30); }
 [data-testid="stBottom"] [data-testid="stPopover"] button:hover { background: #116FFF; }
 
+/* Esclarecimento: a pergunta do analista em destaque + a caixa de texto pisca em laranja (3 vezes) até a resposta */
+.pergunta-esclarecer { border: 2px solid #FF8A00; background: rgba(255,138,0,.12); border-radius: 14px;
+    padding: 14px 18px; margin: 6px 0 4px 0; font-size: 1.15rem; font-weight: 700; color: #FFFFFF; line-height: 1.4; }
+@keyframes pulso-laranja { 0%, 100% { box-shadow: 0 0 0 4px rgba(255,138,0,.15); }
+                           50% { box-shadow: 0 0 0 10px rgba(255,138,0,.45); } }
+body:has(.aguardando-resposta) [data-testid="stChatInput"] { border-color: #FF8A00 !important;
+    animation: pulso-laranja 1.4s ease-in-out 3; box-shadow: 0 0 0 4px rgba(255,138,0,.25); }
+.aguardando-resposta { display: none; }
+/* O script de rolagem fica num iframe de altura 0: some com o espaço que ele ocuparia */
+[data-testid="stElementContainer"]:has(iframe[height="0"]) { display: none; }
+
+/* Celular: caixa de pergunta e botão Localização LADO A LADO e mais baixos (antes ocupavam 38% da tela) */
+@media (max-width: 640px) {
+    [data-testid="stBottom"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 8px !important;
+        align-items: stretch !important; }
+    /* o botão acompanha a altura da caixa de pergunta (mesma altura, como no notebook) */
+    [data-testid="stBottom"] [data-testid="stColumn"]:last-child [data-testid="stVerticalBlock"],
+    [data-testid="stBottom"] [data-testid="stColumn"]:last-child [data-testid="stElementContainer"],
+    [data-testid="stBottom"] [data-testid="stColumn"]:last-child [data-testid="stLayoutWrapper"],
+    [data-testid="stBottom"] [data-testid="stPopover"], [data-testid="stBottom"] [data-testid="stPopover"] > div,
+    [data-testid="stBottom"] [data-testid="stPopover"] button { height: 100% !important; }
+    [data-testid="stBottom"] [data-testid="stColumn"]:first-child { flex: 1 1 auto !important; min-width: 0 !important; width: auto !important; }
+    [data-testid="stBottom"] [data-testid="stColumn"]:last-child { flex: 0 0 92px !important; min-width: 92px !important; width: 92px !important; }
+    [data-testid="stBottom"] [data-testid="stPopover"] button [data-testid="stIconMaterial"] { display: none; }
+    [data-testid="stChatInput"] { min-height: 52px; box-shadow: 0 0 0 3px rgba(17,111,255,.15); }
+    [data-testid="stChatInput"] > div { padding-left: 12px !important; padding-right: 6px !important; }
+    /* texto e botão de enviar na MESMA linha (no padrão do Streamlit o botão fica numa linha de baixo) */
+    [data-testid="stChatInput"] > div > div { flex-direction: row !important; align-items: center; }
+    [data-testid="stChatInput"] > div > div > div:first-child { flex: 1 1 auto; min-width: 0; }
+    [data-testid="stChatInput"] > div > div > div:last-child { flex: 0 0 auto !important; width: auto !important; }
+    [data-testid="stChatInput"] textarea { font-size: 0.95rem !important; }
+    [data-testid="stBottom"] [data-testid="stPopover"] button { min-height: 52px; padding: 4px 6px;
+        box-shadow: 0 0 0 3px rgba(17,111,255,.15); }
+    [data-testid="stBottom"] [data-testid="stPopover"] button p { font-size: 0.72rem; white-space: normal; line-height: 1.2;
+        overflow-wrap: normal; word-break: keep-all; }
+}
+
 /* Mensagens da conversa: pergunta (azul) e resposta (ciano) bem separadas.
    Cada mensagem leva um marcador invisível (.msg-usuario / .msg-analista) e o CSS usa :has() para estilizá-la. */
 [data-testid="stChatMessage"] { background: #10222A; border: 1px solid #1B3440; border-radius: 16px; padding: 12px 16px;
@@ -266,16 +304,39 @@ def mostrar_pergunta(texto: str) -> None:
     st.markdown(texto_seguro(texto))
 
 
+def rolar_ate_ultima_mensagem() -> None:
+    """Rola a conversa até o INÍCIO da última mensagem (pergunta recém-enviada ou resposta recém-chegada).
+    Sem isso, no celular a tela fica parada e a pessoa não vê a resposta nem um pedido de esclarecimento.
+    Script mínimo num iframe invisível: só rola a página (não lê nem altera dados). O comentário com um número
+    novo a cada chamada faz o Streamlit executar o script de novo."""
+    components.html(f"""<!-- {uuid.uuid4().hex} --><script>
+      setTimeout(function () {{
+        const doc = window.parent.document;
+        const msgs = doc.querySelectorAll('[data-testid="stChatMessage"]');
+        const area = doc.querySelector('[data-testid="stMain"]');
+        if (!msgs.length || !area) return;
+        const alvo = msgs[msgs.length - 1];
+        // em tela larga o cabeçalho fica fixo no topo: desconta a altura dele
+        const cab = window.parent.innerWidth >= 900 ? doc.querySelector('.topo') : null;
+        const folga = cab ? cab.closest('[data-testid="stElementContainer"]').offsetHeight + 16 : 12;
+        area.scrollBy({{top: alvo.getBoundingClientRect().top - area.getBoundingClientRect().top - folga,
+                        behavior: 'smooth'}});
+      }}, 350);
+    </script>""", height=0)
+
+
 def mostrar_resposta(res: dict) -> None:
     st.markdown(MARCA_ANALISTA, unsafe_allow_html=True)
     nome, cor, _ = CLASSES.get(res["classe"], (res["classe"], "#5B6B82", ""))
     st.markdown(f'<span class="classe" style="background:{cor}">{nome}</span>', unsafe_allow_html=True)
-    st.markdown(texto_seguro(res["resposta"]))
     if res["classe"] == "ESCLARECIMENTO":
-        # Deixa claro que a resposta vem DEPOIS que o usuário esclarecer (não é uma falha)
-        st.markdown('<div class="aviso-esclarecer">👉 <b>Para eu buscar o preço, responda na caixa abaixo</b> '
-                    '(por exemplo: <i>"o município"</i>, <i>"o estado"</i> ou <i>"3 km"</i>). Eu lembro da sua '
-                    'pergunta anterior e completo a consulta.</div>', unsafe_allow_html=True)
+        # Pedido de esclarecimento em DESTAQUE (um usuário não percebeu que precisava responder — 24/11)
+        st.markdown(f'<div class="pergunta-esclarecer">❓ {texto_seguro(res["resposta"])}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="aviso-esclarecer">👇 <b>Responda na caixa de pergunta, lá embaixo</b> — por exemplo: '
+                    '<i>"gasolina"</i>, <i>"o estado"</i> ou <i>"3 km"</i>. Eu lembro da sua pergunta anterior e '
+                    'completo a consulta.</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(texto_seguro(res["resposta"]))
     if res.get("linhas"):
         # Ordem: texto (acima) → gráfico → tabela (+ CSV) → SQL
         df = pd.DataFrame(res["linhas"], columns=res["colunas"])
@@ -515,6 +576,7 @@ if pergunta:
     st.session_state.mensagens.append({"papel": "usuario", "texto": pergunta})
     with st.chat_message("user", avatar="🧑"):
         mostrar_pergunta(pergunta)
+    rolar_ate_ultima_mensagem()          # mostra a pergunta e o progresso dos agentes (no celular a tela não rolava)
     with st.chat_message("assistant", avatar="⛽"):
         st.markdown(MARCA_ANALISTA, unsafe_allow_html=True)    # já estiliza o quadro enquanto os agentes trabalham
         with st.status("Analisando a pergunta…", expanded=True) as status:
@@ -536,6 +598,7 @@ if pergunta:
                                    *credenciais_registro())
         if res:
             mostrar_resposta(res)
+    rolar_ate_ultima_mensagem()          # leva a tela ao INÍCIO da resposta (ou do pedido de esclarecimento)
     if res:
         st.session_state.mensagens.append({"papel": "assistente", "texto": res["resposta"], "res": res})
         st.session_state.custo_sessao += res["uso"]["custo_usd"]
@@ -599,11 +662,17 @@ if st.session_state.pedindo_gps:                       # o navegador pede permis
         st.rerun()
 
 local = st.session_state.localizacao
+# O analista pediu um esclarecimento e espera a resposta? -> a caixa muda o texto e pisca em laranja (CSS :has)
+ultima = st.session_state.mensagens[-1] if st.session_state.mensagens else None
+aguardando_resposta = bool(ultima and ultima["papel"] == "assistente" and ultima["res"]["classe"] == "ESCLARECIMENTO")
+if aguardando_resposta and not esgotado:
+    st.markdown('<span class="aguardando-resposta"></span>', unsafe_allow_html=True)
 with st._bottom:                                      # rodapé fixo da página, onde fica a caixa de pergunta
     col_pergunta, col_local = st.columns([4, 1.4], vertical_alignment="bottom")
     with col_pergunta:
         st.chat_input("Limite de perguntas atingido." if esgotado else
-                      "Pergunte sobre preços de combustíveis… (ex.: quanto está o diesel em Curitiba?)",
+                      "✍️ Responda aqui…" if aguardando_resposta else
+                      "Pergunte sobre preços…",
                       max_chars=MAX_CARACTERES, disabled=esgotado, key="entrada", on_submit=ao_enviar)
     with col_local:
         with st.popover("✅ Localização" if local else "📍 Localização", use_container_width=True):
