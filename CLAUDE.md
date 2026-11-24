@@ -5,7 +5,8 @@
 > Histórico completo de progresso: `STATUS.md`. Enunciado original: `docs/Projeto_Final_Analista_Virtual.pdf`.
 
 ## ▶️ ONDE PARAMOS (atualizar ao fim de cada sessão)
-- Última sessão: 22/11/2026 (migração do claude.ai para o Claude Code).
+- Última sessão: 24/11/2026. **PROJETO CONCLUÍDO — única pendência: o aluno apresentar ao professor**
+  (roteiro, slides, perguntas e ensaio prontos em `docs/`; checklist da véspera em `docs/roteiro_apresentacao.md`).
 - **Etapa atual: 2.5 — `src/semantic_layer.yaml`**, construído em micro-passos:
   - ✅ 2.5.1 seção `projeto` + `tabelas` (6 tabelas, todas as colunas descritas)
   - ✅ 2.5.2 `relacionamentos` (5 JOINs N:1 verificados, `aliases_padrao` f/t/p/l/pr/b, `joins_proibidos`)
@@ -167,12 +168,14 @@
   (5/5 ok; 24–48 s cada; roteiro ajustado) ✅ — tudo aprovado e commitado. ⬜ 6.5 ensaio → `docs/demo_apresentacao.md` (valores + prints).
   - (antigo) ⬜ PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação (demo ao vivo com perguntas de reserva; todos sabem
     explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
-  Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).
+  (Itens menores encerrados em 24/11: versão do DuckDB mantida como está, por decisão do aluno; demo do Checkpoint 2
+  coberta pela demo da apresentação.)
   - Na construção dos agentes: separar instrução × dado nos prompts (pergunta só na mensagem do usuário; resultado do
     banco marcado como dados); pedidos de alterar dados/revelar segredos = fora de escopo.
   - Técnicas de custo combinadas: só o pedaço necessário do YAML, cache de prompt (prefixo fixo), Analista recebe
     ~20 linhas, testes sem LLM, cache em disco no desenvolvimento, ~10 perguntas de desenvolvimento, tokens registrados.
-- Pendente: fixar a versão do DuckDB no `requirements.txt` (venv tem duckdb 2.0.1; requirements diz `>=1.1`).
+- DuckDB: venv com 2.0.1, `requirements.txt` com `>=1.1` (mantido assim por decisão do aluno; se o banco não abrir
+  noutra máquina, recriar com `python src/load_data.py`).
 
 ## Modo de trabalho (IMPORTANTE)
 Grupo: Douglas H. da Silva, Jeferson Stenzel, Leonardo M. L. Rodrigues, Leonardo M. Lima — cada um faz o projeto

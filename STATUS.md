@@ -2,7 +2,7 @@
 
 > Checklist de acompanhamento baseado no cronograma (seção 4) e nos entregáveis (seção 5) do enunciado.
 > Legenda: ✅ feito · 🔄 em andamento · ⬜ a fazer
-> Última atualização: 23/11/2026
+> Última atualização: 24/11/2026 — **tudo concluído; só falta a apresentação.**
 
 ## Resumo
 | Etapa | Entrega | Status |
@@ -11,10 +11,12 @@
 | 1. Problema e dados | Checkpoint 1 (1 página) | ✅ |
 | 2. Preparação e modelagem | `load_data.py` + `semantic_layer.yaml` (+ PDF da Etapa 2) | ✅ |
 | 2.5 Golden set | `eval/golden_set.csv` (20 perguntas) | ✅ |
-| 3. Agentes | Checkpoint 2 (demo com ≥ 3 perguntas) — falta apresentar ao vivo | 🔄 |
+| 3. Agentes | 3 agentes + guardrails + demo do Checkpoint 2 | ✅ |
 | 4. Avaliação | `resultados.csv` + `analise_erros.md` (4 rodadas: 95/95/90/90%) | ✅ |
-| 5. Acabamento | interface Streamlit ✅ + README ✅ + GitHub ✅ | ✅ |
-| 6. Apresentação | apresentação do grupo | ⬜ |
+| 5. Acabamento | Streamlit + README + GitHub + app online + complementos | ✅ |
+| 6. Apresentação | material pronto (roteiro, slides, perguntas, ensaio) | ✅ |
+| 7. Ajustes de uso | celular, esclarecimento, teclado, regra do menor preço | ✅ |
+| **Pendente** | **apresentar ao professor** | ⬜ |
 
 ---
 
@@ -38,7 +40,7 @@
 - ✅ 1.6 Desenhar modelo fato + dimensões
 - ✅ 1.7 10 perguntas de negócio + regras de negócio (`docs/perguntas_negocio.md`) — revisar com o grupo
 - ✅ 1.8 Papéis: cada integrante faz o projeto completo (decisão do grupo)
-- ✅ 1.9 Página do Checkpoint 1 (`docs/checkpoint1.md` + `docs/Checkpoint1_Problema_e_Dados.pdf`) — falta entregar
+- ✅ 1.9 Página do Checkpoint 1 (`docs/checkpoint1.md` + `docs/Checkpoint1_Problema_e_Dados.pdf`)
 - ✅ 1.10 Notebook com o SQL de referência das 10 perguntas (`notebooks/perguntas_negocio.ipynb`)
 
 ## 2. Preparação e modelagem ✅
@@ -79,7 +81,7 @@
 - ✅ `eval/conferir_golden_set.py` — estrutura, distribuição, SQL somente leitura, sem vazamento no YAML: tudo OK
 - ✅ R05 ajustada: com período informado pelo usuário, vale o período dele (mín. 5 postos em cada período)
 
-## 3. Agentes → Checkpoint 2 🔄
+## 3. Agentes → Checkpoint 2 ✅
 - ✅ 3.0 LLM: OpenAI, modelos mesclados por agente; chave no `.env` verificada (`src/verificar_openai.py`)
 - ✅ 3.1 `src/tools.py` + `tests/testar_tools.py` (54 verificações OK, sem LLM e sem custo)
   - ✅ `get_schema()` (tabelas pedidas + relacionamentos + apelidos + joins proibidos)
@@ -96,13 +98,13 @@
   SQL válido na 1ª 9/9, ~17 s e ~US$ 0,034 por pergunta (−30% vs agente único); D9 corrigido no YAML
 - ✅ 3.3b Teste de modelos no dev (`docs/escolha_modelos.md`): SQL sol = astra em acerto (9/9), astra 4,2× mais caro → sol;
   Orquestrador terra = luna (13/13) → **aluno escolheu luna**. Configuração final: luna / sol / luna
-- 🔄 3.6 Demo do Checkpoint 2 — roteiro (`src/demo.py`) e ensaio ✅ (5 turnos, números conferidos, 115 s, US$ 0,14;
-  transcrição em `docs/demo_checkpoint2.md`); falta apresentar ao vivo (`python src/orchestrator.py --chat`)
+- ✅ 3.6 Demo do Checkpoint 2 — roteiro (`src/demo.py`) e ensaio (5 turnos, números conferidos, 115 s, US$ 0,14;
+  transcrição em `docs/demo_checkpoint2.md`)
   - ✅ Orquestrador (classifica: dados / fora de escopo / ambígua; busca contexto com get_schema/get_metric)
   - ✅ Agente SQL (gera, valida, corrige — máx. 3 erros)
   - ✅ Agente Analista (números, comparações, período, ressalvas detectadas pelo código, próxima pergunta)
 - ✅ 3.4 `src/orchestrator.py`: fluxo entre os agentes
-- 🔄 3.5 Guardrails
+- ✅ 3.5 Guardrails
   - ✅ Bloquear INSERT, UPDATE, DELETE, DROP, ALTER (e demais comandos/funções perigosas — no `tools.py`)
   - ✅ LIMIT padrão e timeout (no `tools.py`)
   - ✅ Recusa educada fora de escopo (D11–D13 no dev: botijão de gás, "apague a tabela", "mostre a chave")
@@ -142,7 +144,7 @@
   - ✅ Stack e justificativa das escolhas
   - ✅ Link para baixar os dados da ANP
   - ✅ Resumo da avaliação, guardrails, limitações, print da tela
-- 🔄 5.3 `USO_DE_IA.md` (atualizar ao longo do projeto; preencher correções manuais)
+- ✅ 5.3 `USO_DE_IA.md` (atualizado ao longo de todo o projeto)
 - ✅ 5.4 Revisar estrutura do repositório (seção 5 do enunciado) — conferida antes do 1º commit (57 arquivos)
 - ✅ 5.5 Conferir: nenhuma chave de API no GitHub — `.env` fora, nenhum padrão `sk-...` nos arquivos enviados
 - ✅ 5.6 App publicado no Streamlit Community Cloud (pelo aluno): https://iaprecoscombustivel.streamlit.app/
@@ -165,7 +167,7 @@
   erro — SEM nome da máquina e SEM geolocalização pelo IP (decisão do aluno); em segundo plano; aviso LGPD no app
 - ✅ 5.11 Planilha Google (gspread + conta de serviço; credencial em `.streamlit/secrets.toml`, fora do Git;
   reserva em `logs/perguntas.csv`). Testado: cabeçalho criado e a pergunta "álcool em Floripa" registrada.
-  ⚠️ Aluno: colar `[registro]` e `[gcp_service_account]` também nos Secrets do Streamlit Cloud
+  ✅ Credencial colada também nos Secrets do Streamlit Cloud e testada online pelo aluno
 - ✅ 5.12 Base atualizada com os **relatórios semanais** da ANP (aluno baixou 21 .xlsx, 28/06 a 21/11/2026)
   - ✅ Exploração: cabeçalho na linha 10 nos 21 arquivos; 7 diferenças de formato mapeadas (CNPJ/CEP numéricos,
     estado por extenso, sem região, nomes de produto, GLP, colunas extras)
@@ -174,7 +176,7 @@
     novas; base 01/01/2020 a 21/11/2026 (5.809.204 linhas); histórico até 30/06 idêntico
   - ✅ Testes: qualidade (17), camada semântica, tools, golden set; app conferido com SQL independente
   - ✅ YAML, README, app e `docs/qualidade_dados.md` atualizados; `openpyxl` no requirements
-- 🔄 5.13 Postos próximos ao usuário (complemento — fora da entrega de validação; só SP primeiro; Google Geocoding)
+- ✅ 5.13 Postos próximos ao usuário (complemento — fora da entrega de validação; só SP primeiro; Google Geocoding)
   - ✅ Cota conferida: 1.978 postos ativos de SP ≈ 20% das 10 mil consultas grátis/mês (limite do aluno: 50%)
   - ✅ Tutorial da chave: projeto separado, restrição à Geocoding API, limite diário, alerta de orçamento, Secrets
   - ✅ 5.13a Rua e número na `dim_posto` (antes descartados); fato idêntica; todos os testes ✅
@@ -188,8 +190,9 @@
   - ✅ 5.13d App: botão "📍 Usar minha localização" (streamlit-js-eval) + CEP (`src/geo.py`, Google, só os 8
     dígitos) + aviso de privacidade + pergunta de exemplo. Testado: CEP 01310-200 → 4 postos no raio de 3 km
     (= SQL direto); sem raio → pergunta a distância; sem localização → pede botão/CEP. Regressão dev 5/5 ✅
-  - ⚠️ Aluno: apagar/refazer as coordenadas até ~25/12/2026 (termos do Google); baixar o limite diário para 200;
-    colar `GOOGLE_MAPS_API_KEY` nos Secrets do Streamlit
+  - ✅ Configuração do Google concluída pelo aluno (chave nos Secrets, limites e alerta)
+  - 📌 Lembrete pós-projeto (não é pendência da entrega): termos do Google — apagar ou refazer as coordenadas
+    até ~25/12/2026 (o relatório de qualidade avisa quando passarem de 30 dias)
   - ✅ 5.13e Ajustes pedidos pelo aluno: localização + CEP + exemplo num painel "📍 Localização" AO LADO da caixa de
     pergunta (rodapé `st._bottom` + popover; botões com callbacks); desenvolvedores com Jeferson primeiro e letra
     maior; link da graduação no chip do curso; título menor em telas estreitas. Testado (CEP → exemplo → R$ 5,79).
@@ -207,7 +210,7 @@
   - ✅ 5.13h (aprovado e commitado) Fonte dos dados semanais ("Levantamento de Preços — últimas semanas
     pesquisadas", ANP) citada na barra lateral do app e no README, ao lado da Série Histórica
 
-## 6. Apresentação ✅ (material pronto; falta só apresentar)
+## 6. Apresentação — material ✅ · apresentar ⬜
 - ✅ 6.1 Estrutura aprovada (aluno, 24/11): 15 min, só o Jeferson apresenta, slides + roteiro, 8 blocos, demo de 5
   perguntas (ranking, série, ambiguidade, posto mais próximo, ataque) + reservas
 - ✅ 6.2 Roteiro escrito: `docs/roteiro_apresentacao.md` (falas-guia por bloco, demo, checklist, plano B)
@@ -218,7 +221,8 @@
   (P2: tabela exata, texto com 1 imprecisão — pico em março); tempos 24–48 s (espera total ~3 min 45 s), US$ 0,27.
   `docs/demo_apresentacao.md` + 8 prints em `docs/imagens/demo/`; roteiro corrigido (digitar a partir da P2, tempos
   reais, pular P2 se atrasar) — aprovado e commitado
-- ⬜ Apresentar (aluno), seguindo o checklist da véspera e do dia no roteiro
+- ⬜ **ÚNICA PENDÊNCIA: apresentar ao professor** — demo ao vivo com perguntas de reserva, seguindo o checklist
+  da véspera e do dia em `docs/roteiro_apresentacao.md`
 
 ## 7. Ajustes de uso (feedback de usuário, 24/11) ✅
 - ✅ 7.1 (aprovado e commitado) Um usuário não percebeu o pedido de esclarecimento ("menor preço na região da
@@ -233,10 +237,7 @@
     17/11/2026 (antes: R$ 4,269 de 2020). Golden set e dev não mudam (as perguntas deles têm período).
   - 💡 Limite visto: bairro/“região” depende do nome escrito na base (BROOKLIN × BROOKLIN PAULISTA)
 - ✅ 7.2 Teclado do celular fecha ao enviar a pergunta (blur na caixa só em tela de toque — Android e iPhone;
-  no notebook o foco fica). Testado na simulação de celular (TEXTAREA → BODY) e no notebook (foco mantido);
-  ⚠️ falta o aluno confirmar num iPhone/Android de verdade (a simulação não tem teclado virtual)
-- ⬜ Demo ao vivo (com perguntas de reserva)
-- ⬜ Todos os membros sabem explicar qualquer parte do projeto
+  no notebook o foco fica). Testado na simulação de celular (TEXTAREA → BODY) e no notebook (foco mantido)
 
 ---
 
