@@ -46,8 +46,8 @@ checa("get_schema(['dim_local']) inclui a fato e só a relação com dim_local",
 r = tools.get_schema(["tabela_que_nao_existe"])
 checa("get_schema com tabela inexistente -> erro amigável", not r["ok"] and "tabelas_validas" in r)
 r = tools.get_metric()
-checa("get_metric() devolve o catálogo com 10 métricas",
-      r["ok"] and len(yaml.safe_load(r["conteudo"])["catalogo_de_metricas"]) == 10)
+checa("get_metric() devolve o catálogo com 11 métricas (10 + distancia_km, complemento 24/11)",
+      r["ok"] and len(yaml.safe_load(r["conteudo"])["catalogo_de_metricas"]) == 11)
 r = tools.get_metric(["preco_medio"])
 checa("get_metric(['preco_medio']) traz o padrão da média por posto (R13)", r["ok"] and "padrao_media_por_posto" in r["conteudo"])
 r = tools.get_metric(["faturamento"])

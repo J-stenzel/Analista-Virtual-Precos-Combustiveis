@@ -42,6 +42,7 @@ RAW = RAIZ / "data" / "raw"
 RAW_SEMANAL = RAIZ / "data" / "raw_semanal"
 DB_PADRAO = RAIZ / "data" / "processed" / "combustiveis.duckdb"
 RELATORIO = RAIZ / "docs" / "qualidade_dados.md"
+GEO = RAIZ / "data" / "processed" / "postos_geo.csv"     # coordenadas dos postos (geocodificar_postos.py)
 
 # ---------------------------------------------------------------------------
 # Regras de padronização (decisões de negócio documentadas em docs/exploracao.md)
@@ -313,9 +314,22 @@ def criar_dimensoes(con: duckdb.DuckDBPyConnection) -> None:
               FROM stg_limpo GROUP BY bandeira)
     """)
 
-    # dim_posto: dados cadastrais MAIS RECENTES de cada CNPJ
+    # Coordenadas dos postos (5.13, complemento): vêm de data/processed/postos_geo.csv, gerado por
+    # src/geocodificar_postos.py (Google; guardar por até 30 dias — ver geocodificado_em). Sem o arquivo: colunas nulas.
+    if GEO.exists():
+        con.execute(f"""CREATE OR REPLACE TEMP TABLE geo AS
+            SELECT cnpj, latitude::DOUBLE AS latitude, longitude::DOUBLE AS longitude, precisao_geo,
+                   geocodificado_em::DATE AS geocodificado_em
+            FROM read_csv('{GEO.as_posix()}', header=true, all_varchar=true) WHERE status = 'OK'""")
+    else:
+        con.execute("""CREATE OR REPLACE TEMP TABLE geo (cnpj VARCHAR, latitude DOUBLE, longitude DOUBLE,
+                       precisao_geo VARCHAR, geocodificado_em DATE)""")
+
+    # dim_posto: dados cadastrais MAIS RECENTES de cada CNPJ (+ coordenadas, quando houver)
     con.execute("""
         CREATE OR REPLACE TABLE dim_posto AS
+        SELECT c.*, g.latitude, g.longitude, g.precisao_geo, g.geocodificado_em
+        FROM (
         SELECT cnpj,
                arg_max(razao_social, data_coleta) AS razao_social,
                arg_max(endereco, data_coleta)     AS endereco,
@@ -326,6 +340,7 @@ def criar_dimensoes(con: duckdb.DuckDBPyConnection) -> None:
                MAX(data_coleta)                   AS ultima_coleta
         FROM stg_limpo
         GROUP BY cnpj
+        ) c LEFT JOIN geo g USING (cnpj)
     """)
 
 
@@ -364,6 +379,12 @@ TESTES = [
      "SELECT COALESCE(SUM(qtd_registros_origem - 1), 0) FROM fato_precos"),
     ("Postos sem rua no cadastro (informativo; não serão geocodificados pelo endereço)", "INFO",
      "SELECT COUNT(*) FROM dim_posto WHERE endereco IS NULL OR endereco = ''"),
+    ("Postos com coordenadas (informativo; complemento 5.13 — só SP por enquanto)", "INFO",
+     "SELECT COUNT(*) FROM dim_posto WHERE latitude IS NOT NULL"),
+    ("Coordenada fora do Brasil (lat -34 a 6, lon -74 a -34)", "CRITICO",
+     "SELECT COUNT(*) FROM dim_posto WHERE latitude NOT BETWEEN -34 AND 6 OR longitude NOT BETWEEN -74 AND -34"),
+    ("Coordenadas com mais de 30 dias (termos do Google: apagar ou refazer)", "ALERTA",
+     "SELECT COUNT(*) FROM dim_posto WHERE geocodificado_em < CURRENT_DATE - INTERVAL 30 DAY"),
     ("Nulos em colunas-chave da fato", "CRITICO",
      """SELECT COUNT(*) FROM fato_precos
         WHERE data IS NULL OR cnpj IS NULL OR id_local IS NULL OR id_produto IS NULL

@@ -6,6 +6,8 @@
 data/raw/*.csv
 data/raw/*.zip
 data/raw_semanal/*.xlsx
+# Coordenadas do Google (termos: guardar por até 30 dias) — ficam só locais; o banco leva as colunas
+data/processed/postos_geo.csv
 data/processed/*.duckdb.wal
 # (o combustiveis.duckdb tem ~40 MB e PODE ir para o GitHub — limite é 100 MB)
 

@@ -131,8 +131,12 @@
     alerta de orçamento); coordenadas na `dim_posto` + `geocodificado_em` (termos do Google: apagar/refazer em 30
     dias — aluno fará a exclusão); raio vem da pergunta (sem raio → perguntar, sugerir 3 km); botão de localização
     do navegador + CEP; registro guarda coordenada arredondada (2 casas) ou o CEP digitado.
-    ✅ 5.13a rua + número na `dim_posto` (fato idêntica; testes ✅). ⬜ 5.13b script de geocodificação (aguarda a
-    chave do aluno) ⬜ 5.13c YAML (distância/R15) ⬜ 5.13d app.
+    ✅ 5.13a rua + número na `dim_posto`. ✅ 5.13b `src/geocodificar_postos.py` → `data/processed/postos_geo.csv`
+    (fora do Git) → `load_data.py` leva para a `dim_posto`. ✅ 5.13c métrica `distancia_km` + **R15**; Orquestrador
+    recebe só SE há localização (mensagem "developer"); o código passa lat/lon ao Agente SQL. ✅ 5.13d app: botão
+    (`streamlit-js-eval`) + CEP (`src/geo.py`) + exemplo. Testado no app (CEP, sem raio, sem localização) + dev 5/5.
+    **Pendências do aluno:** Secrets `GOOGLE_MAPS_API_KEY`; limite diário do Google → 200; apagar/refazer as
+    coordenadas até ~25/12/2026. Expandir para os demais estados = rodar `geocodificar_postos.py --uf XX`.
   - ⬜ 5.10 Registro das perguntas em CSV (IP, navegador/sistema, fuso, idioma, nome opcional; **sem** nome da máquina
     e **sem** geolocalização). ⬜ 5.11 Planilha Google — mais à frente (aluno cria a conta de serviço).
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem

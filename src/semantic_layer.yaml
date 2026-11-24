@@ -106,6 +106,10 @@ tabelas:
       cep: "CEP no formato '00000-000'."
       primeira_coleta: "Primeira data em que o posto aparece na pesquisa."
       ultima_coleta: "Última data em que o posto aparece na pesquisa (indica quão recente é o dado do posto)."
+      latitude: "Latitude do posto (graus decimais). Só postos de SP com coleta recente; os demais = NULL (R15)."
+      longitude: "Longitude do posto (graus decimais). NULL quando o posto não foi geocodificado (R15)."
+      precisao_geo: "Precisão da coordenada (Google): ROOFTOP = no endereço; GEOMETRIC_CENTER/APPROXIMATE = centro da rua/área."
+      geocodificado_em: "Data em que a coordenada foi obtida (termos do Google: renovar ou apagar após 30 dias)."
 
 # -----------------------------------------------------------------------------
 # 3. RELACIONAMENTOS  (passo 2.5.2)
@@ -235,6 +239,16 @@ metricas:
   periodo_da_amostra:
     descricao: "Datas da 1ª e da última coleta usadas no cálculo. Obrigatório em respostas sobre 'atual'/'último mês'/'recente'."
     expressao_sql: "MIN(f.data) AS primeira_coleta, MAX(f.data) AS ultima_coleta"
+
+  distancia_km:
+    descricao: "Distância em linha reta (km) entre o usuário e o posto — fórmula de haversine (R15, só postos com coordenada)."
+    expressao_sql: >
+      2 * 6371 * ASIN(SQRT(POWER(SIN(RADIANS(p.latitude - (<lat_usuario>)) / 2), 2)
+        + COS(RADIANS(<lat_usuario>)) * COS(RADIANS(p.latitude))
+        * POWER(SIN(RADIANS(p.longitude - (<lon_usuario>)) / 2), 2)))
+    unidade: "km"
+    exige: ["LOCALIZAÇÃO DO USUÁRIO recebida do app (lat/lon)", "p.latitude IS NOT NULL", "JOIN dim_posto p"]
+    observacao: "6371 = raio médio da Terra em km. Não é a distância de carro. Ver o exemplo completo na R15."
 
   variacao_percentual:
     descricao: "Variação % do preço médio (por posto) entre um período base (A) e um final (B): (média B ÷ média A − 1) × 100."
@@ -685,6 +699,52 @@ regras_de_negocio:
     nome: precos_fora_do_padrao
     regra: "Preços muito altos ou baixos NÃO são removidos nem marcados: entram no cálculo; o usuário avalia."
 
+  - id: R15
+    nome: postos_proximos
+    regra: >
+      "Postos perto de mim / mais próximos / num raio de X km" (complemento de 24/11, só SP por enquanto):
+      precisa da LOCALIZAÇÃO DO USUÁRIO, que o app entrega ao Agente SQL como dado (lat/lon) — nunca inventar
+      nem estimar a localização. O RAIO vem da pergunta ("3 km", "até 5 km"); sem raio informado -> ESCLARECIMENTO
+      perguntando a distância (sugerir 3 km). Sem localização -> ESCLARECIMENTO pedindo para clicar em
+      "📍 Usar minha localização" ou informar o CEP. Consulta: só postos com coordenada (p.latitude IS NOT NULL),
+      última coleta DAQUELE produto de cada posto dentro da janela recente (R06), distância pela métrica
+      distancia_km <= raio, ordenar pelo preço (empate: menor distância), LIMIT = quantidade pedida (padrão 10).
+      Mostrar razão social, endereço, número, bairro, distância (km, 1 casa), preço e data da coleta.
+    excecao: >
+      Nenhum posto no raio -> dizer isso e sugerir um raio maior (não ampliar sozinho). A distância é em LINHA RETA
+      (não é o trajeto de carro) e só cobre postos da AMOSTRA da ANP em SP com coordenada.
+    exemplo:
+      pergunta: "Liste os 10 postos mais próximos de mim com a gasolina mais barata num raio de 3 km"
+      localizacao_teste: "lat -23.5614, lon -46.6559 (Av. Paulista, 1578 — MASP)"
+      sql: |
+        WITH janela AS (
+          SELECT CAST(date_trunc('month', MAX(data)) - INTERVAL 2 MONTH AS DATE) AS inicio, MAX(data) AS fim
+          FROM fato_precos
+        ),
+        ultima AS (
+          SELECT f.cnpj, f.data, f.valor_venda
+          FROM fato_precos f
+          JOIN dim_produto pr ON pr.id_produto = f.id_produto
+          JOIN janela         ON f.data BETWEEN janela.inicio AND janela.fim
+          WHERE pr.produto = 'GASOLINA'
+          QUALIFY ROW_NUMBER() OVER (PARTITION BY f.cnpj ORDER BY f.data DESC) = 1
+        ),
+        perto AS (
+          SELECT p.razao_social, p.endereco, p.numero, p.bairro, u.valor_venda, u.data AS data_coleta,
+                 2 * 6371 * ASIN(SQRT(POWER(SIN(RADIANS(p.latitude - (-23.5614)) / 2), 2)
+                   + COS(RADIANS(-23.5614)) * COS(RADIANS(p.latitude))
+                   * POWER(SIN(RADIANS(p.longitude - (-46.6559)) / 2), 2))) AS distancia_km
+          FROM ultima u
+          JOIN dim_posto p ON p.cnpj = u.cnpj
+          WHERE p.latitude IS NOT NULL
+        )
+        SELECT razao_social, endereco, numero, bairro, ROUND(distancia_km, 1) AS distancia_km,
+               valor_venda, data_coleta
+        FROM perto
+        WHERE distancia_km <= 3
+        ORDER BY valor_venda, distancia_km
+        LIMIT 10
+
 # Checklist que o Agente SQL confere ANTES de executar:
 checklist_sql:
   - "Produto filtrado (ou agrupado)? 'gasolina' virou 'GASOLINA'? (R10, R11)"
@@ -697,6 +757,8 @@ checklist_sql:
   - "O usuário comparou opções que ELE citou (ex.: 'Shell, BR ou Ipiranga', 'etanol ou gasolina')? Traga TODAS,
      cada uma com o seu valor, ordenadas — sem LIMIT 1 (quem aponta a vencedora é a resposta). (Correção de 23/11.)"
   - "A última consulta executada com sucesso é a resposta COMPLETA? (nada de paginar com OFFSET)"
+  - "Postos próximos: usou a LOCALIZAÇÃO DO USUÁRIO recebida (nunca inventada), o raio da pergunta,
+     p.latitude IS NOT NULL e a métrica distancia_km? (R15)"
 
 # Ressalvas que o Agente Analista acrescenta à resposta quando se aplicam:
 ressalvas:
@@ -706,3 +768,4 @@ ressalvas:
   ano_incompleto: "2026 só tem dados até 21/11/2026 (novembro incompleto)."
   amostra_pequena: "Poucos postos no recorte (< 5): a média pode não representar o local (avisar, não recusar)."
   amostra_muda: "Em comparações entre períodos, os postos pesquisados podem não ser os mesmos."
+  distancia: "Distância em linha reta (não é o trajeto); só postos da amostra da ANP em SP com localização (R15)."

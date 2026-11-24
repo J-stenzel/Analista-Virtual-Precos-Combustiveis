@@ -30,14 +30,15 @@ def _somar(*usos: dict) -> dict:
     return total
 
 
-def responder(pergunta: str, historico: list | None = None, ao_etapa=None) -> dict:
+def responder(pergunta: str, historico: list | None = None, ao_etapa=None, localizacao: dict | None = None) -> dict:
     """Responde UMA pergunta passando pelos 3 agentes. Mesmo formato de saída do agente único.
     ao_etapa (opcional): função chamada com "orquestrador", "sql" ou "analista" quando cada agente começa
-    (a interface usa para mostrar o progresso; não muda a lógica)."""
+    (a interface usa para mostrar o progresso; não muda a lógica).
+    localizacao (opcional, complemento 5.13): {"lat", "lon", "fonte"} do usuário, para "postos perto de mim" (R15)."""
     avisar = ao_etapa or (lambda etapa: None)
     inicio = time.perf_counter()
     avisar("orquestrador")
-    orq = agents.orquestrador(pergunta, historico)
+    orq = agents.orquestrador(pergunta, historico, tem_localizacao=localizacao is not None)
     usos = {"orquestrador": orq["uso"]}
     base = {"pergunta": pergunta, "classe": orq["classe"], "colunas": None, "linhas": None, "sql": None,
             "tentativas_run_sql": 0, "sql_ok_1a_tentativa": None, "erros_sql": [], "motivo_parada": "resposta",
@@ -47,7 +48,7 @@ def responder(pergunta: str, historico: list | None = None, ao_etapa=None) -> di
         resposta = orq["mensagem_usuario"] or "Não consegui interpretar a pergunta."
     else:
         avisar("sql")
-        sql = agents.agente_sql(orq["pergunta_completa"], orq["contexto"], orq["observacoes"])
+        sql = agents.agente_sql(orq["pergunta_completa"], orq["contexto"], orq["observacoes"], localizacao)
         usos["sql"] = sql["uso"]
         base.update({k: sql[k] for k in ("colunas", "linhas", "sql", "tentativas_run_sql",
                                           "sql_ok_1a_tentativa", "erros_sql", "motivo_parada")})

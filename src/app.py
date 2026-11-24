@@ -34,6 +34,8 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))
 import llm           # noqa: E402
 import orchestrator  # noqa: E402
+import geo           # noqa: E402  (CEP -> coordenada, complemento 5.13)
+from streamlit_js_eval import get_geolocation  # noqa: E402  (localização do navegador, com permissão do usuário)
 
 # ---------------------------------------------------------------------------
 # Dados do projeto (cabeçalho e barra lateral)
@@ -66,6 +68,7 @@ EXEMPLOS = [
     "Qual o preço do GNV no Rio de Janeiro?",
     "Como variou mês a mês o preço médio da gasolina no Paraná em 2025?",
     "Quais os 5 estados com o etanol mais barato atualmente?",
+    "Liste os 10 postos mais próximos de mim com a gasolina mais barata num raio de 3 km",   # 5.13 (só SP)
 ]
 ETAPAS = {"orquestrador": "🧭 Orquestrador: entendendo a pergunta e buscando o contexto…",
           "sql": "🧮 Agente SQL: escrevendo, validando e executando a consulta…",
@@ -219,8 +222,8 @@ def mostrar_resposta(res: dict) -> None:
     if res["classe"] == "ESCLARECIMENTO":
         # Deixa claro que a resposta vem DEPOIS que o usuário esclarecer (não é uma falha)
         st.markdown('<div class="aviso-esclarecer">👉 <b>Para eu buscar o preço, responda na caixa abaixo</b> '
-                    '(por exemplo: <i>"o município"</i> ou <i>"o estado"</i>). Eu lembro da sua pergunta anterior '
-                    'e completo a consulta.</div>', unsafe_allow_html=True)
+                    '(por exemplo: <i>"o município"</i>, <i>"o estado"</i> ou <i>"3 km"</i>). Eu lembro da sua '
+                    'pergunta anterior e completo a consulta.</div>', unsafe_allow_html=True)
     if res.get("linhas"):
         # Ordem: texto (acima) → gráfico → tabela (+ CSV) → SQL
         df = pd.DataFrame(res["linhas"], columns=res["colunas"])
@@ -301,6 +304,8 @@ if "mensagens" not in st.session_state:
     st.session_state.custo_sessao = 0.0
     st.session_state.pendente = None         # pergunta vinda de um botão de exemplo
 st.session_state.setdefault("perguntas_feitas", 0)   # NÃO zera no "Nova conversa" (senão furaria o limite)
+st.session_state.setdefault("localizacao", None)     # {"lat", "lon", "fonte", "descricao"} — só nesta sessão
+st.session_state.setdefault("pedindo_gps", False)
 
 # ---------------------------------------------------------------------------
 # Barra lateral
@@ -320,6 +325,42 @@ with st.sidebar:
     for i, exemplo in enumerate(EXEMPLOS):
         if st.button(exemplo, key=f"ex_{i}", use_container_width=True):
             st.session_state.pendente = exemplo
+
+    # --- Localização do usuário (5.13: "postos perto de mim", só SP por enquanto) ---
+    st.markdown('<div class="lateral-titulo">📍 Sua localização</div>', unsafe_allow_html=True)
+    local = st.session_state.localizacao
+    if local:
+        st.markdown(f'<div class="lateral-texto">✅ {local["fonte"]}<br><small>{local.get("descricao", "")}</small></div>',
+                    unsafe_allow_html=True)
+        if st.button("Remover localização", use_container_width=True):
+            st.session_state.localizacao = None
+            st.rerun()
+    else:
+        if st.button("📍 Usar minha localização", use_container_width=True):
+            st.session_state.pedindo_gps = True                   # o navegador vai pedir permissão
+        if st.session_state.pedindo_gps:
+            gps = get_geolocation(component_key="gps")            # 1ª execução: None; depois, a resposta do navegador
+            if gps:
+                st.session_state.pedindo_gps = False
+                coords = gps.get("coords") if isinstance(gps, dict) else None
+                if coords and coords.get("latitude") is not None:
+                    st.session_state.localizacao = {"lat": coords["latitude"], "lon": coords["longitude"],
+                                                    "fonte": "localização do navegador",
+                                                    "descricao": f"precisão ~{round(coords.get('accuracy') or 0)} m"}
+                    st.rerun()
+                else:
+                    st.warning("Não foi possível obter a localização (permissão negada?). Informe um CEP.")
+        with st.form("form_cep", clear_on_submit=False, border=False):
+            cep = st.text_input("ou informe um CEP", placeholder="ex.: 01310-200", max_chars=10)
+            if st.form_submit_button("Usar este CEP", use_container_width=True):
+                r = geo.geocodificar_cep(cep)
+                if r["ok"]:
+                    st.session_state.localizacao = {k: r[k] for k in ("lat", "lon", "fonte", "descricao")}
+                    st.rerun()
+                st.warning(r["erro"])
+    st.markdown('<div class="lateral-texto"><small>Usada só para calcular a distância até os postos (vai na consulta '
+                'aos agentes); não fica guardada. Postos com localização: estado de SP.</small></div>',
+                unsafe_allow_html=True)
 
     st.markdown('<div class="lateral-titulo">Agentes e modelos</div><div class="lateral-texto">'
                 f'🧭 Orquestrador: {llm.MODELOS["orquestrador"]}<br>🧮 Agente SQL: {llm.MODELOS["sql"]}<br>'
@@ -422,7 +463,8 @@ if pergunta:
                 st.write(ETAPAS[etapa])
             res = None
             try:
-                res = orchestrator.responder(pergunta, historico, ao_etapa=ao_etapa)
+                res = orchestrator.responder(pergunta, historico, ao_etapa=ao_etapa,
+                                             localizacao=st.session_state.localizacao)
                 rotulo = CLASSES.get(res["classe"], ("", "", "Pronto"))[2]
                 status.update(label=f"{rotulo} ({res['tempo_s']} s)", state="complete", expanded=False)
             except llm.ErroLLM as erro:

@@ -5,5 +5,6 @@ pyyaml>=6.0
 python-dotenv>=1.0
 openai>=3.57        # LLM dos agentes (Etapa 3); chave em OPENAI_API_KEY no .env
 streamlit>=1.35
+streamlit-js-eval>=1.0   # localização do navegador (botão "📍 Usar minha localização", complemento 5.13)
 ipykernel>=6.0      # para rodar os notebooks no VS Code
 matplotlib>=3.8     # gráficos (make_chart, Etapa 3) e fonte DejaVu para gerar os PDFs de entrega

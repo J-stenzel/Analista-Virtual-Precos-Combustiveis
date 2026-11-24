@@ -1,6 +1,6 @@
 # Relatório de qualidade dos dados
 
-Gerado por `src/load_data.py` em 24/11/2026 12:15.
+Gerado por `src/load_data.py` em 24/11/2026 12:38.
 
 Período da base: 01/01/2020 a 21/11/2026.
 
@@ -30,6 +30,9 @@ Período da base: 01/01/2020 a 21/11/2026.
 | Linhas vazias removidas (informativo) | INFO | 9.114 | ℹ️ |
 | Registros de origem agregados por duplicidade (informativo) | INFO | 20 | ℹ️ |
 | Postos sem rua no cadastro (informativo; não serão geocodificados pelo endereço) | INFO | 0 | ℹ️ |
+| Postos com coordenadas (informativo; complemento 5.13 — só SP por enquanto) | INFO | 1.978 | ℹ️ |
+| Coordenada fora do Brasil (lat -34 a 6, lon -74 a -34) | CRITICO | 0 | ✅ |
+| Coordenadas com mais de 30 dias (termos do Google: apagar ou refazer) | ALERTA | 0 | ✅ |
 | Nulos em colunas-chave da fato | CRITICO | 0 | ✅ |
 | Duplicatas no grão (data, cnpj, produto) | CRITICO | 0 | ✅ |
 | CNPJ com tamanho diferente de 14 dígitos | CRITICO | 0 | ✅ |

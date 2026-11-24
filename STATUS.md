@@ -175,9 +175,18 @@
   - ✅ Cota conferida: 1.978 postos ativos de SP ≈ 20% das 10 mil consultas grátis/mês (limite do aluno: 50%)
   - ✅ Tutorial da chave: projeto separado, restrição à Geocoding API, limite diário, alerta de orçamento, Secrets
   - ✅ 5.13a Rua e número na `dim_posto` (antes descartados); fato idêntica; todos os testes ✅
-  - ⬜ 5.13b `geocodificar_postos.py` (aguarda `GOOGLE_MAPS_API_KEY` do aluno) + colunas de geocode na `dim_posto`
-  - ⬜ 5.13c YAML: `distancia_km` (haversine) + R15 (raio da pergunta; sem raio → perguntar, sugerir 3 km)
-  - ⬜ 5.13d App: botão "📍 Usar minha localização" + CEP + pergunta de exemplo + aviso de privacidade
+  - ✅ Chave do Google testada (1 consulta: MASP na coordenada certa; outra API recusada)
+  - ✅ 5.13b `geocodificar_postos.py` (cache com retomada, teto, validação do município, nova tentativa em falha
+    de rede — a 1ª carga caiu no posto 512 com WinError 10054) + colunas `latitude`, `longitude`, `precisao_geo`,
+    `geocodificado_em` na `dim_posto` + 3 testes de qualidade (informativo, fora do Brasil, > 30 dias).
+    Piloto 20/20 no município certo (13 ROOFTOP, 7 centro da rua)
+  - ✅ 5.13c YAML: métrica `distancia_km` (haversine) + R15 + checklist + ressalva "distancia"; agentes: o app
+    informa ao Orquestrador SE há localização (mensagem developer) e o CÓDIGO entrega lat/lon ao Agente SQL
+  - ✅ 5.13d App: botão "📍 Usar minha localização" (streamlit-js-eval) + CEP (`src/geo.py`, Google, só os 8
+    dígitos) + aviso de privacidade + pergunta de exemplo. Testado: CEP 01310-200 → 4 postos no raio de 3 km
+    (= SQL direto); sem raio → pergunta a distância; sem localização → pede botão/CEP. Regressão dev 5/5 ✅
+  - ⚠️ Aluno: apagar/refazer as coordenadas até ~25/12/2026 (termos do Google); baixar o limite diário para 200;
+    colar `GOOGLE_MAPS_API_KEY` nos Secrets do Streamlit
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação
