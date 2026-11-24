@@ -1,17 +1,28 @@
 # Relatório de qualidade dos dados
 
-Gerado por `src/load_data.py` em 21/11/2026 16:38.
+Gerado por `src/load_data.py` em 24/11/2026 11:25.
+
+Período da base: 01/01/2020 a 21/11/2026.
+
+## Relatórios semanais (data/raw_semanal)
+| Item | Linhas |
+|---|---:|
+| Arquivos .xlsx | 21 |
+| Linhas lidas | 424.948 |
+| Descartadas: GLP (fora da série histórica) | 68.162 |
+| Descartadas: datas que a série semestral já tem | 11.472 |
+| Acrescentadas à base | 345.314 |
 
 ## Volume por tabela
 | Tabela | Linhas |
 |---|---:|
-| stg_bruto | 5.473.024 |
-| fato_precos | 5.463.890 |
-| dim_tempo | 2.373 |
+| stg_bruto | 5.818.338 |
+| fato_precos | 5.809.204 |
+| dim_tempo | 2.517 |
 | dim_local | 471 |
 | dim_produto | 6 |
-| dim_bandeira | 76 |
-| dim_posto | 21.103 |
+| dim_bandeira | 77 |
+| dim_posto | 21.184 |
 
 ## Testes
 | Teste | Tipo | Resultado | Status |
@@ -29,5 +40,7 @@ Gerado por `src/load_data.py` em 21/11/2026 16:38.
 | Produto sem tipo de combustível mapeado | CRITICO | 0 | ✅ |
 | Região sem nome mapeado | CRITICO | 0 | ✅ |
 | Preço fora da faixa plausível (0.5–20.0) | ALERTA | 0 | ✅ |
+| UF ausente ou fora do padrão de 2 letras (ex.: estado do semanal sem sigla mapeada) | CRITICO | 0 | ✅ |
+| Produto fora dos 6 da série histórica (ex.: GLP do semanal) | CRITICO | 0 | ✅ |
 | UF associada a mais de uma região | CRITICO | 0 | ✅ |
 | Meses (ano_mes) sem nenhuma coleta | ALERTA | 1 | ⚠️ |

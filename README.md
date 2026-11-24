@@ -97,13 +97,15 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-**2. Banco de dados** — o arquivo `data/processed/combustiveis.duckdb` (~40 MB) já vem no repositório.
+**2. Banco de dados** — o arquivo `data/processed/combustiveis.duckdb` (~42 MB) já vem no repositório.
 Para recriá-lo a partir dos dados originais: baixe os CSVs semestrais de **combustíveis automotivos** de 2020.01 a
-2026.01 em [ANP — Série Histórica de Preços de Combustíveis](https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis),
-salve-os em `data/raw/` e rode (≈30 s, com 15 testes de qualidade):
+2026.01 em [ANP — Série Histórica de Preços de Combustíveis](https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis)
+e salve-os em `data/raw/`; os relatórios **semanais** da ANP (`revendas_lpc_*.xlsx`, de 28/06 a 21/11/2026) vão em
+`data/raw_semanal/`. Depois rode (≈1 min, com 17 testes de qualidade):
 ```bash
 python src/load_data.py
 ```
+> `python src/load_data.py --sem-semanal` recria a base **só até 30/06/2026** — a base em que o golden set foi avaliado.
 > O arquivo `.duckdb` é gerado pela versão do DuckDB instalada (usamos a **2.0.1**). Arquivos de versão mais nova não
 > abrem em versão mais antiga — se der erro ao abrir, recrie o banco com o comando acima.
 
@@ -150,18 +152,26 @@ python eval/conferir_golden_set.py
 
 **Fonte:** ANP — Série Histórica de Preços de Combustíveis (Levantamento de Preços de Combustíveis), dados abertos.
 Preços de venda ao consumidor coletados semanalmente numa **amostra** de postos de ~470 municípios,
-**jan/2020 a jun/2026** (13 arquivos CSV, ~5,47 milhões de linhas). Sem dados pessoais sensíveis.
+**01/01/2020 a 21/11/2026**: série histórica semestral até jun/2026 (13 arquivos CSV) + 21 relatórios
+**semanais** de 28/06 a 21/11/2026 (.xlsx), ~5,81 milhões de linhas. Sem dados pessoais sensíveis.
 
 Modelo **estrela** em DuckDB (`src/load_data.py`):
 
 | Tabela | Linhas | Conteúdo |
 |---|---:|---|
-| `fato_precos` | 5.463.890 | 1 preço de 1 produto, em 1 posto, em 1 data de coleta |
-| `dim_tempo` | 2.373 | calendário diário (ano, semestre, trimestre, mês, semana) |
+| `fato_precos` | 5.809.204 | 1 preço de 1 produto, em 1 posto, em 1 data de coleta |
+| `dim_tempo` | 2.517 | calendário diário (ano, semestre, trimestre, mês, semana) |
 | `dim_local` | 471 | região → UF → município |
 | `dim_produto` | 6 | gasolina, gasolina aditivada, etanol, diesel, diesel S10, GNV (+ unidade) |
-| `dim_bandeira` | 76 | bandeira padronizada (ex.: Petrobras/Vibra → VIBRA) + flag bandeira branca |
-| `dim_posto` | 21.103 | CNPJ, razão social, bairro, CEP, 1ª e última coleta |
+| `dim_bandeira` | 77 | bandeira padronizada (ex.: Petrobras/Vibra → VIBRA) + flag bandeira branca |
+| `dim_posto` | 21.184 | CNPJ, razão social, bairro, CEP, 1ª e última coleta |
+
+**Relatórios semanais:** o Excel da ANP tem o cabeçalho na linha 10 e formato diferente do CSV. O `load_data.py`
+converte para o mesmo padrão (CNPJ com 14 dígitos e CEP `00000-000` — o Excel guarda como número e perde os zeros;
+estado por extenso → sigla; região derivada da UF; "GASOLINA COMUM" → GASOLINA; "DIESEL S500" → DIESEL), ignora as
+colunas extras, descarta o GLP (fora da série histórica) e as datas que a série semestral já tem. Validação: as
+11.472 coletas de 29–30/06/2026 presentes nos dois formatos têm **100% dos valores iguais**, e a base até 30/06
+continuou idêntica (0 linhas diferentes).
 
 Limpeza: codificação por arquivo (UTF-8/latin-1), 9.114 linhas vazias removidas, CNPJ normalizado, bandeiras
 renomeadas unificadas, 20 duplicatas no grão tratadas pela média, "Valor de Compra" descartada (só existia até
@@ -251,6 +261,7 @@ custaram menos de US$ 8. Cada chamada é registrada em `logs/uso_llm.csv`.
 ├── requirements.txt · .env.example · .gitignore
 ├── assets/                    # logos (Impacta e ANP)
 ├── data/raw/                  # CSVs da ANP (não versionados — baixar no link acima)
+├── data/raw_semanal/          # relatórios semanais .xlsx da ANP (não versionados)
 ├── data/processed/            # combustiveis.duckdb (modelo estrela)
 ├── docs/                      # entregas (PDFs), exploração, qualidade, escolha de modelos, demo
 ├── notebooks/                 # SQL de referência das perguntas de negócio
@@ -277,7 +288,9 @@ custaram menos de US$ 8. Cada chamada é registrada em `logs/uso_llm.csv`.
 ## 10. Limitações
 
 - A ANP pesquisa uma **amostra** de postos e municípios — não é o universo de postos do Brasil.
-- Não há coleta em **set/2020**; 2026 vai só até **30/06/2026**.
+- Não há coleta em **set/2020**; 2026 vai só até **21/11/2026** (novembro incompleto).
+- A avaliação do golden set (seção 7) foi feita na base até 30/06/2026 (`load_data.py --sem-semanal` a recria);
+  com os dados semanais, as respostas sobre "atual"/"recente" passam a usar out–nov/2026.
 - A base não tem preço de compra, margem, volume vendido nem GLP.
 - Preços fora do padrão não são removidos nem marcados (decisão do grupo): o usuário avalia.
 - Respostas com dados levam em média ~20 s (às vezes mais, conforme a latência da API).

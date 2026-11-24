@@ -16,7 +16,8 @@
 projeto:
   nome: "Analista Virtual de Preços de Combustíveis"
   fonte: "ANP — Série Histórica de Preços de Combustíveis (Levantamento de Preços de Combustíveis - LPC)"
-  periodo_coberto: "jan/2020 a jun/2026 (set/2020 sem coleta; hipótese: pandemia)"
+  periodo_coberto: "01/01/2020 a 21/11/2026 (set/2020 sem coleta; hipótese: pandemia). Até 30/06/2026 = série
+    histórica semestral; de 01/07 a 21/11/2026 = relatórios semanais da ANP (mesma pesquisa, mesmo formato na base)."
   banco: "DuckDB (SQL dialeto DuckDB)"
   descricao: >
     Preços de venda ao consumidor de combustíveis automotivos, coletados semanalmente
@@ -46,10 +47,11 @@ tabelas:
       id_bandeira: "Bandeira do posto NA DATA da coleta (o posto pode trocar de bandeira). Liga com dim_bandeira.id_bandeira."
       valor_venda: "Preço de venda ao consumidor em R$. Por litro, exceto GNV, que é por m³."
       qtd_registros_origem: "Uso técnico: quantas linhas do CSV original viraram este registro (>1 = duplicata tratada pela média)."
-      arquivo_origem: "Uso técnico: semestre do arquivo da ANP de onde veio o dado (ex.: '2025.01')."
+      arquivo_origem: "Uso técnico: arquivo da ANP de onde veio o dado — semestre (ex.: '2025.01') ou semana do
+        relatório semanal (ex.: 'semanal 2026-11-15' = semana que começa em 15/11/2026)."
 
   dim_tempo:
-    descricao: "Calendário: um registro por dia, de 01/01/2020 a 30/06/2026 (inclui dias sem coleta)."
+    descricao: "Calendário: um registro por dia, de 01/01/2020 a 21/11/2026 (inclui dias sem coleta)."
     chave: [data]
     colunas:
       data: "Dia (DATE)."
@@ -490,7 +492,7 @@ sinonimos:
 # 6. REGRAS DE NEGOCIO  (passo 2.5.5)
 # -----------------------------------------------------------------------------
 # Regras decididas pelo aluno. TODA consulta deve respeitá-las.
-# Datas: a base vai de 01/01/2020 a 30/06/2026. Termos relativos são calculados
+# Datas: a base vai de 01/01/2020 a 21/11/2026. Termos relativos são calculados
 # a partir da ÚLTIMA DATA DA BASE, nunca do relógio.
 # Cada regra tem um id (R01...) para ser citada na análise de erros (Etapa 4).
 regras_de_negocio:
@@ -556,7 +558,7 @@ regras_de_negocio:
     resposta_deve_ter: ["mês (AAAA-MM)", "1ª e última data de coleta usadas", "nº de postos"]
     exemplo:
       pergunta: "Qual o preço atual do etanol em Goiânia?"
-      resultado_teste: "R$ 4,534 · 49 postos · 2026-06 (01/06 a 30/06/2026)"
+      resultado_teste: "R$ 4,183 · 46 postos · 2026-11 (03/11 a 16/11/2026)"
       sql: |
         WITH recorte AS (
           SELECT f.cnpj, f.data, f.valor_venda, t.ano_mes
@@ -618,7 +620,7 @@ regras_de_negocio:
     nome: coleta_recente
     regra: >
       "Recente" / "agora" para indicar ou listar POSTOS = os últimos 3 meses até o último mês
-      com dados na base (hoje: 01/04/2026 a 30/06/2026), usando a última coleta de cada posto na janela.
+      com dados na base (hoje: set/2026 a 21/11/2026), usando a última coleta de cada posto na janela.
     exemplo:
       pergunta: "Quais postos de Recife têm a gasolina aditivada mais barata agora?"
       resultado_teste: "1º: 247 COMERCIO LTDA (Afogados), R$ 6,93 em 17/06/2026."
@@ -699,6 +701,6 @@ ressalvas:
   amostra: "A ANP pesquisa uma AMOSTRA de postos e municípios, não todos."
   coleta_antiga: "O preço é da última coleta disponível (<data>), que é antiga (R07)."
   setembro_2020: "Não há coleta em set/2020 (lacuna da ANP). Séries mensais de 2020 terão esse buraco."
-  ano_incompleto: "2026 só tem dados até 30/06/2026."
+  ano_incompleto: "2026 só tem dados até 21/11/2026 (novembro incompleto)."
   amostra_pequena: "Poucos postos no recorte (< 5): a média pode não representar o local (avisar, não recusar)."
   amostra_muda: "Em comparações entre períodos, os postos pesquisados podem não ser os mesmos."

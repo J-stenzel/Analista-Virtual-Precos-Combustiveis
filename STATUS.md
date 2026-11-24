@@ -163,6 +163,14 @@
 - ⬜ 5.10 Registro das perguntas: data, sessão, IP, navegador/sistema, fuso, idioma, nome opcional, pergunta,
   tipo, custo (SEM nome da máquina e SEM geolocalização — decisão do aluno). CSV local agora
 - ⬜ 5.11 Planilha Google (conta de serviço) — mais à frente, com tutorial para o aluno
+- ✅ 5.12 Base atualizada com os **relatórios semanais** da ANP (aluno baixou 21 .xlsx, 28/06 a 21/11/2026)
+  - ✅ Exploração: cabeçalho na linha 10 nos 21 arquivos; 7 diferenças de formato mapeadas (CNPJ/CEP numéricos,
+    estado por extenso, sem região, nomes de produto, GLP, colunas extras)
+  - ✅ Validação: 11.472 coletas de 29–30/06 iguais nos 2 formatos (100%) → semanal descarta datas ≤ 30/06
+  - ✅ `load_data.py`: `ler_semanal()` + 2 testes CRÍTICOS novos (UF, produto) + `--sem-semanal`; 345.314 linhas
+    novas; base 01/01/2020 a 21/11/2026 (5.809.204 linhas); histórico até 30/06 idêntico
+  - ✅ Testes: qualidade (17), camada semântica, tools, golden set; app conferido com SQL independente
+  - ✅ YAML, README, app e `docs/qualidade_dados.md` atualizados; `openpyxl` no requirements
 
 ## 6. Apresentação ⬜
 - ⬜ Roteiro da apresentação

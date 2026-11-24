@@ -1,7 +1,8 @@
 """
 Etapa 2 — Carga, limpeza, modelagem (estrela) e testes de qualidade.
 
-Entrada : data/raw/*.csv  (ANP — Série Histórica de Preços de Combustíveis, semestral)
+Entrada : data/raw/*.csv  (ANP — Série Histórica de Preços de Combustíveis, semestral: jan/2020 a jun/2026)
+          data/raw_semanal/*.xlsx  (ANP — Levantamento de Preços, relatórios SEMANAIS por posto, depois de jun/2026)
 Saída   : data/processed/combustiveis.duckdb  com o modelo estrela:
 
                  dim_tempo
@@ -13,9 +14,12 @@ Saída   : data/processed/combustiveis.duckdb  com o modelo estrela:
 Como rodar (na pasta do projeto):
     python src/load_data.py
     python src/load_data.py --db caminho/outro.duckdb   (opcional)
+    python src/load_data.py --sem-semanal   (recria a base SÓ com os CSVs semestrais, até 30/06/2026 —
+                                             a base em que o golden set foi avaliado)
 
 Etapas do script (cada uma é uma função):
     1. ler_bruto()        -> stg_bruto       (tudo como texto, 1 linha por linha do CSV)
+       ler_semanal()      -> + stg_bruto     (converte os .xlsx semanais para as MESMAS colunas do CSV)
     2. limpar()           -> stg_limpo       (tipos, padronizações, linhas vazias, duplicatas)
     3. criar_dimensoes()  -> dim_*           (chaves substitutas inteiras)
     4. criar_fato()       -> fato_precos
@@ -24,15 +28,18 @@ Etapas do script (cada uma é uma função):
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import tempfile
 import time
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
 RAIZ = Path(__file__).resolve().parents[1]
 RAW = RAIZ / "data" / "raw"
+RAW_SEMANAL = RAIZ / "data" / "raw_semanal"
 DB_PADRAO = RAIZ / "data" / "processed" / "combustiveis.duckdb"
 RELATORIO = RAIZ / "docs" / "qualidade_dados.md"
 
@@ -58,6 +65,28 @@ TIPO_COMBUSTIVEL = {
     "DIESEL S10": "DIESEL",
     "GNV": "GNV",
 }
+
+# --- Relatórios SEMANAIS (.xlsx): diferenças em relação aos CSVs semestrais ---
+# O estado vem por extenso e não há coluna de região: sigla e região saem destas tabelas.
+ESTADO_SIGLA = {
+    "ACRE": "AC", "ALAGOAS": "AL", "AMAPA": "AP", "AMAZONAS": "AM", "BAHIA": "BA", "CEARA": "CE",
+    "DISTRITO FEDERAL": "DF", "ESPIRITO SANTO": "ES", "GOIAS": "GO", "MARANHAO": "MA", "MATO GROSSO": "MT",
+    "MATO GROSSO DO SUL": "MS", "MINAS GERAIS": "MG", "PARA": "PA", "PARAIBA": "PB", "PARANA": "PR",
+    "PERNAMBUCO": "PE", "PIAUI": "PI", "RIO DE JANEIRO": "RJ", "RIO GRANDE DO NORTE": "RN",
+    "RIO GRANDE DO SUL": "RS", "RONDONIA": "RO", "RORAIMA": "RR", "SANTA CATARINA": "SC", "SAO PAULO": "SP",
+    "SERGIPE": "SE", "TOCANTINS": "TO",
+}
+UF_REGIAO = {
+    **dict.fromkeys(["AC", "AM", "AP", "PA", "RO", "RR", "TO"], "N"),
+    **dict.fromkeys(["AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"], "NE"),
+    **dict.fromkeys(["DF", "GO", "MS", "MT"], "CO"),
+    **dict.fromkeys(["ES", "MG", "RJ", "SP"], "SE"),
+    **dict.fromkeys(["PR", "RS", "SC"], "S"),
+}
+# Nomes de produto do semanal -> nomes da série histórica (os outros 4 já são iguais)
+PRODUTO_SEMANAL = {"GASOLINA COMUM": "GASOLINA", "DIESEL S500": "DIESEL"}
+PRODUTOS_FORA_DA_BASE = {"GLP"}   # botijão (R$/13 kg): a série histórica não tem GLP
+LINHA_CABECALHO_SEMANAL = 10      # linhas 1–9 = título do relatório; dados a partir da linha 11
 
 TABELAS_FINAIS = ["fato_precos", "dim_tempo", "dim_local", "dim_produto", "dim_bandeira", "dim_posto"]
 
@@ -105,6 +134,68 @@ def ler_bruto(con: duckdb.DuckDBPyConnection) -> None:
                               all_varchar=true, encoding='{enc}')"""
         )
     con.execute("CREATE OR REPLACE TABLE stg_bruto AS " + " UNION ALL BY NAME ".join(partes))
+
+
+def ler_semanal(con: duckdb.DuckDBPyConnection) -> dict:
+    """Lê os relatórios SEMANAIS (.xlsx) e acrescenta à stg_bruto com as MESMAS colunas (texto) do CSV.
+    Assim limpar(), dimensões, fato e testes valem igual para as duas fontes.
+    Devolve contagens para o relatório de qualidade."""
+    arquivos = sorted(RAW_SEMANAL.glob("*.xlsx"))
+    contagem = {"arquivos": len(arquivos), "lidas": 0, "glp": 0, "sobrepostas": 0, "inseridas": 0}
+    if not arquivos:
+        log("nenhum .xlsx semanal encontrado — base só com os CSVs semestrais")
+        return contagem
+    # Última data da série semestral: o semanal só acrescenta o que vem DEPOIS (o 1º arquivo repete 29–30/06)
+    ultima = con.execute("""SELECT MAX(strptime(TRIM("Data da Coleta"), '%d/%m/%Y'))::DATE FROM stg_bruto
+                            WHERE "Produto" IS NOT NULL AND TRIM("Produto") <> ''""").fetchall()[0][0]
+    partes = []
+    for arq in arquivos:
+        # Tudo como texto (dtype=str), como nos CSVs. Os nomes dos arquivos variam (2026-06-28 ou 2026_10_11):
+        inicio = "-".join(re.search(r"(\d{4})[-_](\d{2})[-_](\d{2})", arq.stem).groups())
+        log(f"lendo {arq.name}")
+        df = pd.read_excel(arq, header=LINHA_CABECALHO_SEMANAL - 1, dtype=str)
+        df.columns = [str(c).strip().upper() for c in df.columns]
+        df["arquivo_origem"] = f"semanal {inicio}"
+        partes.append(df)
+    s = pd.concat(partes, ignore_index=True)
+    contagem["lidas"] = len(s)
+
+    # Filtros: produto fora da base (GLP) e datas que a série semestral já tem
+    produto = s["PRODUTO"].str.strip().str.upper()
+    data = pd.to_datetime(s["DATA DA COLETA"].str.strip()).dt.date
+    contagem["glp"] = int(produto.isin(PRODUTOS_FORA_DA_BASE).sum())
+    contagem["sobrepostas"] = int((~produto.isin(PRODUTOS_FORA_DA_BASE) & (data <= ultima)).sum())
+    manter = ~produto.isin(PRODUTOS_FORA_DA_BASE) & (data > ultima)
+    s, produto, data = s[manter], produto[manter], data[manter]
+
+    # Conversão para o formato do CSV (colunas extras — FANTASIA, ENDEREÇO, NÚMERO, COMPLEMENTO — ficam de fora)
+    uf = s["ESTADO"].str.strip().str.upper().map(ESTADO_SIGLA)          # sem mapa -> nulo -> teste CRÍTICO
+    cnpj = s["CNPJ"].str.replace(r"\D", "", regex=True).str.zfill(14)    # Excel guardou como número: perdeu zeros
+    cep = s["CEP"].fillna("").str.replace(r"\D", "", regex=True).str.zfill(8)
+    convertido = pd.DataFrame({
+        "arquivo_origem": s["arquivo_origem"],
+        "Regiao - Sigla": uf.map(UF_REGIAO),
+        "Estado - Sigla": uf,
+        "Municipio": s["MUNICÍPIO"],
+        "Revenda": s["RAZÃO"],
+        "CNPJ da Revenda": cnpj,
+        "Bairro": s["BAIRRO"],
+        # mesmo formato da base (00000-000); CEP vazio ou "0" fica nulo (não inventa um CEP 00000-000)
+        "Cep": (cep.str[:5] + "-" + cep.str[5:]).where(cep.str.strip("0") != "", None),
+        "Produto": produto.replace(PRODUTO_SEMANAL),
+        "Data da Coleta": pd.to_datetime(data).dt.strftime("%d/%m/%Y"),
+        "Valor de Venda": s["PREÇO DE REVENDA"].astype(float).round(3).map("{:.3f}".format),
+        "Unidade de Medida": s["UNIDADE DE MEDIDA"],
+        "Bandeira": s["BANDEIRA"],
+    })
+    con.register("semanal_convertido", convertido)
+    con.execute("INSERT INTO stg_bruto BY NAME SELECT * FROM semanal_convertido")   # colunas ausentes = NULL
+    con.unregister("semanal_convertido")
+    contagem["inseridas"] = len(convertido)
+    log(f"semanal: {fmt(contagem['lidas'])} lidas, {fmt(contagem['glp'])} de GLP descartadas, "
+        f"{fmt(contagem['sobrepostas'])} já existentes (até {ultima:%d/%m/%Y}) descartadas, "
+        f"{fmt(contagem['inseridas'])} acrescentadas")
+    return contagem
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +377,11 @@ TESTES = [
      "SELECT COUNT(*) FROM dim_local WHERE regiao_nome IS NULL"),
     (f"Preço fora da faixa plausível ({PRECO_MIN}–{PRECO_MAX})", "ALERTA",
      f"SELECT COUNT(*) FROM fato_precos WHERE valor_venda < {PRECO_MIN} OR valor_venda > {PRECO_MAX}"),
+    ("UF ausente ou fora do padrão de 2 letras (ex.: estado do semanal sem sigla mapeada)", "CRITICO",
+     "SELECT COUNT(*) FROM dim_local WHERE uf IS NULL OR length(uf) <> 2"),
+    ("Produto fora dos 6 da série histórica (ex.: GLP do semanal)", "CRITICO",
+     "SELECT COUNT(*) FROM dim_produto WHERE produto NOT IN "
+     "('GASOLINA', 'GASOLINA ADITIVADA', 'ETANOL', 'DIESEL', 'DIESEL S10', 'GNV')"),
     ("UF associada a mais de uma região", "CRITICO",
      "SELECT COUNT(*) FROM (SELECT uf FROM dim_local GROUP BY uf HAVING COUNT(DISTINCT regiao_sigla) > 1)"),
     # Esperado: 1 (set/2020 — a ANP não publicou coletas nesse mês). Ver docs/exploracao.md
@@ -300,12 +396,27 @@ def fmt(n: int) -> str:
     return f"{n:,}".replace(",", ".")
 
 
-def testes_qualidade(con: duckdb.DuckDBPyConnection) -> bool:
+def testes_qualidade(con: duckdb.DuckDBPyConnection, semanal: dict | None = None) -> bool:
     linhas_md = [
         "# Relatório de qualidade dos dados",
         "",
         f"Gerado por `src/load_data.py` em {time.strftime('%d/%m/%Y %H:%M')}.",
         "",
+    ]
+    periodo = con.execute("SELECT MIN(data), MAX(data) FROM fato_precos").fetchall()[0]
+    linhas_md += [f"Período da base: {periodo[0]:%d/%m/%Y} a {periodo[1]:%d/%m/%Y}.", ""]
+    if semanal:
+        linhas_md += [
+            "## Relatórios semanais (data/raw_semanal)",
+            "| Item | Linhas |", "|---|---:|",
+            f"| Arquivos .xlsx | {semanal['arquivos']} |",
+            f"| Linhas lidas | {fmt(semanal['lidas'])} |",
+            f"| Descartadas: GLP (fora da série histórica) | {fmt(semanal['glp'])} |",
+            f"| Descartadas: datas que a série semestral já tem | {fmt(semanal['sobrepostas'])} |",
+            f"| Acrescentadas à base | {fmt(semanal['inseridas'])} |",
+            "",
+        ]
+    linhas_md += [
         "## Volume por tabela",
         "| Tabela | Linhas |",
         "|---|---:|",
@@ -340,6 +451,8 @@ def testes_qualidade(con: duckdb.DuckDBPyConnection) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Carga e modelagem da base ANP")
     parser.add_argument("--db", type=Path, default=DB_PADRAO, help="caminho do arquivo DuckDB")
+    parser.add_argument("--sem-semanal", action="store_true",
+                        help="ignora data/raw_semanal (recria a base até 30/06/2026, a do golden set)")
     args = parser.parse_args()
     args.db.parent.mkdir(parents=True, exist_ok=True)
     if args.db.exists():
@@ -354,14 +467,19 @@ def main() -> None:
     con.execute("SET memory_limit = '2GB'")
     con.execute(f"SET temp_directory = '{Path(tempfile.gettempdir()).as_posix()}/duckdb_tmp'")
 
-    log("1/6 lendo CSVs brutos");          ler_bruto(con)
-    log("2/6 limpando e padronizando");    limpar(con)
-    log("3/6 criando dimensões");          criar_dimensoes(con)
-    log("4/6 criando fato");               criar_fato(con)
-    log("5/6 testes de qualidade");        ok = testes_qualidade(con)
+    log("1/7 lendo CSVs brutos");          ler_bruto(con)
+    semanal = None
+    if args.sem_semanal:
+        log("2/7 relatórios semanais IGNORADOS (--sem-semanal)")
+    else:
+        log("2/7 lendo relatórios semanais");  semanal = ler_semanal(con)
+    log("3/7 limpando e padronizando");    limpar(con)
+    log("4/7 criando dimensões");          criar_dimensoes(con)
+    log("5/7 criando fato");               criar_fato(con)
+    log("6/7 testes de qualidade");        ok = testes_qualidade(con, semanal)
 
     # Só as tabelas do modelo estrela vão para o arquivo final (o staging não interessa à LLM)
-    log("6/6 gravando modelo estrela em disco")
+    log("7/7 gravando modelo estrela em disco")
     con.execute(f"ATTACH '{args.db.as_posix()}' AS final")
     for tabela in TABELAS_FINAIS:
         con.execute(f"CREATE TABLE final.{tabela} AS SELECT * FROM {tabela}")

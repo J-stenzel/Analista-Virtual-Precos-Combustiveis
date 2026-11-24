@@ -5,6 +5,7 @@
 # Dados grandes (gerados/baixados localmente — ver README)
 data/raw/*.csv
 data/raw/*.zip
+data/raw_semanal/*.xlsx
 data/processed/*.duckdb.wal
 # (o combustiveis.duckdb tem ~40 MB e PODE ir para o GitHub — limite é 100 MB)
 

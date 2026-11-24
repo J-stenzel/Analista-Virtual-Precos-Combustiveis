@@ -121,6 +121,10 @@
     Ordem da resposta: texto → gráfico → tabela (+ CSV) → SQL. Bug do gráfico de barras corrigido (pandas 3: texto = "str").
   - ✅ 5.9 (24/11) Limite: 20 perguntas/sessão + 500/dia no app (`@st.cache_resource` + Lock; F5/"Nova conversa" não
     zeram; caixa de texto desenhada no FIM do script via `on_submit`). Seletor de modelos v5 **descartado** (2× mais caro).
+  - ✅ 5.9b (24/11) **Dados semanais da ANP** (28/06–21/11/2026) incorporados pelo `load_data.py` (`ler_semanal()`
+    converte o .xlsx para as colunas do CSV). 17 testes de qualidade ✅; histórico até 30/06 idêntico (0 diferenças);
+    camada semântica, tools e golden set ✅; app conferido (etanol Floripa R$ 4,662, 15 postos, nov/2026 = SQL
+    independente). YAML/README/app atualizados para 21/11/2026. `openpyxl` no requirements; `.xlsx` no `.gitignore`.
   - ⬜ 5.10 Registro das perguntas em CSV (IP, navegador/sistema, fuso, idioma, nome opcional; **sem** nome da máquina
     e **sem** geolocalização). ⬜ 5.11 Planilha Google — mais à frente (aluno cria a conta de serviço).
   - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
@@ -165,7 +169,12 @@ Fluxo: Pergunta → entendimento/contexto → gerar e validar SQL → executar �
   → 4 Avaliação → 5 Acabamento (Streamlit + README) → 6 Apresentação.
 
 ## Decisões tomadas
-- **Base:** ANP — Série Histórica de Preços de Combustíveis, semestres 2020.01 a 2026.01 (13 CSVs em `data/raw/`, ~5,47 mi linhas).
+- **Base:** ANP — Série Histórica de Preços de Combustíveis, semestres 2020.01 a 2026.01 (13 CSVs em `data/raw/`, ~5,47 mi linhas)
+  **+ 21 relatórios semanais** `.xlsx` em `data/raw_semanal/` (28/06 a 21/11/2026; 24/11). Base agora: 01/01/2020 a
+  **21/11/2026**, 5.809.204 linhas. Semanal: cabeçalho na linha 10; CNPJ/CEP vêm como número (completar zeros);
+  estado por extenso → sigla; região pela UF; GASOLINA COMUM → GASOLINA, DIESEL S500 → DIESEL; **GLP descartado**;
+  datas ≤ 30/06 descartadas (as 11.472 de 29–30/06 batem 100% com o CSV). `load_data.py --sem-semanal` recria a base
+  até 30/06/2026 (a do golden set). Dado bruto nunca é editado à mão: a limpeza fica no código.
   LaDe e Ola foram consideradas e descartadas.
 - "Valor de Compra" **descartada** (só existia até ago/2020). Endereço detalhado descartado (fica bairro e CEP).
 - **Banco:** DuckDB (colunar, rápido para agregações, um arquivo só). Staging feito em memória (arquivo final ~40 MB).
@@ -191,7 +200,7 @@ Fluxo: Pergunta → entendimento/contexto → gerar e validar SQL → executar �
 - **SEMPRE informar a data/período da pesquisa** em respostas sobre "atual"/"último mês"/"recente".
 - "Gasolina" = GASOLINA comum (aditivada só se pedirem). Nunca misturar R$/litro com GNV (R$/m³).
 - Filtrar município sempre com UF (nomes se repetem entre estados). Municípios estão em MAIÚSCULAS e sem acento.
-- (22/11, novas) **Datas relativas pela última data da BASE, nunca CURRENT_DATE** (base termina 30/06/2026);
+- (22/11, novas) **Datas relativas pela última data da BASE, nunca CURRENT_DATE** (base termina 21/11/2026 desde 24/11; antes, 30/06/2026);
   "ano passado" = 2025, "este ano" = 2026 incompleto. Preço atual do posto = última coleta **daquele produto**; CEP com
   vários postos → listar todos. **Coleta antiga** = data anterior à janela de coleta recente → avisar.
   GNV à parte em rankings entre produtos. Recorte com < 5 postos (fora de ranking) → avisar, não recusar.

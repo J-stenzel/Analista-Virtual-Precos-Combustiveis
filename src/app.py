@@ -314,7 +314,7 @@ with st.sidebar:
                 + "<br>".join(nomes) + "</div>", unsafe_allow_html=True)
     st.markdown('<div class="lateral-titulo">Fonte dos dados</div>'
                 f'<div class="lateral-texto"><a href="{FONTE_URL}" target="_blank">ANP — Série Histórica de Preços '
-                'de Combustíveis</a><br>jan/2020 a jun/2026 · amostra de postos</div>', unsafe_allow_html=True)
+                'de Combustíveis</a><br>jan/2020 a 21/11/2026 · amostra de postos</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="lateral-titulo">Experimente perguntar</div>', unsafe_allow_html=True)
     for i, exemplo in enumerate(EXEMPLOS):

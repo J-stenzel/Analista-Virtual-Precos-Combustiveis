@@ -1,5 +1,6 @@
 duckdb>=1.1
 pandas>=2.0
+openpyxl>=3.1       # leitura dos relatórios semanais .xlsx da ANP (load_data.py)
 pyyaml>=6.0
 python-dotenv>=1.0
 openai>=3.57        # LLM dos agentes (Etapa 3); chave em OPENAI_API_KEY no .env
