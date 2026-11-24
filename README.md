@@ -114,7 +114,7 @@ Para recriá-lo a partir dos dados originais: baixe os CSVs semestrais de **comb
 2026.01 em [ANP — Série Histórica de Preços de Combustíveis](https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis)
 e salve-os em `data/raw/`; os relatórios **semanais** da ANP (`revendas_lpc_*.xlsx`, de 28/06 a 21/11/2026), baixados em
 [ANP — Levantamento de Preços de Combustíveis: últimas semanas pesquisadas](https://www.gov.br/anp/pt-br/assuntos/precos-e-defesa-da-concorrencia/precos/levantamento-de-precos-de-combustiveis-ultimas-semanas-pesquisadas),
-vão em `data/raw_semanal/`. Depois rode (≈1 min, com 17 testes de qualidade):
+vão em `data/raw_semanal/`. Depois rode (≈1 min, com 20 testes de qualidade):
 ```bash
 python src/load_data.py
 ```

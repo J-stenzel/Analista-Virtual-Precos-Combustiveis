@@ -153,7 +153,13 @@
     Colunas: data_hora, sessao, ip, navegador, sistema, fuso, idioma, localizacao (~1 km ou CEP), pergunta, classe,
     pergunta_interpretada, linhas, sql_ok_1a_tentativa, custo_usd, tempo_s, erro. Sem nome/máquina/geo por IP.
     Aviso LGPD na barra lateral. **Pendente do aluno:** colar `[registro]` + `[gcp_service_account]` nos Secrets online.
-  - ⬜ **PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação** (demo ao vivo com perguntas de reserva; todos sabem
+- **Etapa 6 — apresentação: MATERIAL PRONTO e commitado (24/11).** Falta só o aluno apresentar (checklist no roteiro). 15 min, só o Jeferson, slides + roteiro.
+  ✅ 6.1 estrutura (8 blocos; demo: 5 estados etanol, PR mês a mês, GNV RJ → "O estado.", posto mais próximo por
+  CEP 01310-200, ataque "apague a tabela"; reservas). 🔄 6.2 `docs/roteiro_apresentacao.md` (aguarda OK, sem commit).
+  🔄 6.3 slides (9) no artifact https://claude.ai/artifact/5RFFZheTRgtYnG9LaSQqQU (tipo Slides; fontes locais em
+  scratchpad — o deck vive no artifact; aprovados) ✅ 6.4 `docs/perguntas_banca.md` (27 perguntas). 🔄 6.5 ensaio → `docs/demo_apresentacao.md` + `docs/imagens/demo/`
+  (5/5 ok; 24–48 s cada; roteiro ajustado) ✅ — tudo aprovado e commitado. ⬜ 6.5 ensaio → `docs/demo_apresentacao.md` (valores + prints).
+  - (antigo) ⬜ PRÓXIMO PASSO: Etapa 6 — roteiro da apresentação (demo ao vivo com perguntas de reserva; todos sabem
     explicar). Commitar e enviar as próximas mudanças ao fim de cada etapa.
   Pendentes menores: fixar versão do DuckDB no requirements; demo do Checkpoint 2 ao vivo (aluno).
   - Na construção dos agentes: separar instrução × dado nos prompts (pergunta só na mensagem do usuário; resultado do

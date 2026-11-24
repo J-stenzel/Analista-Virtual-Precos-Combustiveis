@@ -207,8 +207,18 @@
   - ✅ 5.13h (aprovado e commitado) Fonte dos dados semanais ("Levantamento de Preços — últimas semanas
     pesquisadas", ANP) citada na barra lateral do app e no README, ao lado da Série Histórica
 
-## 6. Apresentação ⬜
-- ⬜ Roteiro da apresentação
+## 6. Apresentação ✅ (material pronto; falta só apresentar)
+- ✅ 6.1 Estrutura aprovada (aluno, 24/11): 15 min, só o Jeferson apresenta, slides + roteiro, 8 blocos, demo de 5
+  perguntas (ranking, série, ambiguidade, posto mais próximo, ataque) + reservas
+- ✅ 6.2 Roteiro escrito: `docs/roteiro_apresentacao.md` (falas-guia por bloco, demo, checklist, plano B)
+- ✅ 6.3 Slides (9, visual do app, notas do apresentador): https://claude.ai/artifact/5RFFZheTRgtYnG9LaSQqQU —
+  conferidos numa pré-visualização local; aprovados pelo aluno
+- ✅ 6.4 `docs/perguntas_banca.md`: 27 perguntas prováveis em 8 temas (aprovado)
+- ✅ 6.5 Ensaio (24/11, app local, CEP 01310-200): as 5 perguntas funcionaram, números conferidos com SQL independente
+  (P2: tabela exata, texto com 1 imprecisão — pico em março); tempos 24–48 s (espera total ~3 min 45 s), US$ 0,27.
+  `docs/demo_apresentacao.md` + 8 prints em `docs/imagens/demo/`; roteiro corrigido (digitar a partir da P2, tempos
+  reais, pular P2 se atrasar) — aprovado e commitado
+- ⬜ Apresentar (aluno), seguindo o checklist da véspera e do dia no roteiro
 - ⬜ Demo ao vivo (com perguntas de reserva)
 - ⬜ Todos os membros sabem explicar qualquer parte do projeto
 
